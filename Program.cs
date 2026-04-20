@@ -1,6 +1,10 @@
 using TicketApplication.Data;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +20,25 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi .. früher Swagger
 builder.Services.AddOpenApi();
 
+bool disableAuthenticationForDevelopment = true; // Auf 'false' setzen für Produktionstest
+if (!disableAuthenticationForDevelopment)
+{
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true, // Das regelt das Timeout!
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = builder.Configuration["Jwt:Issuer"],
+                ValidAudience = builder.Configuration["Jwt:Audience"],
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+            };
+        });
+}
+
 // App-Objekt wird erstellt mit oben implementierten Var etc.
 // Ab dem Build() können keine neuen Services hinzugefügt werden, sondern nurnoch der Ablaufplan (Middelware)
 var app = builder.Build();
@@ -29,6 +52,12 @@ if (app.Environment.IsDevelopment())
 
 // Leitet HTTP Aufrufe als HTTPS weiter
 app.UseHttpsRedirection();
+
+if (!disableAuthenticationForDevelopment)
+{
+    app.UseAuthentication(); // 1. Wer bist du? (Prüft den Token)
+    app.UseAuthorization();  // 2. Was darfst du? (Prüft die Rollen)
+}
 
 app.UseAuthorization();
 

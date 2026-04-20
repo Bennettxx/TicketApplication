@@ -1,4 +1,6 @@
-﻿namespace TicketApplication.Models
+﻿using TicketApplication.Data;
+
+namespace TicketApplication.Models
 {
     public class User
     {
@@ -6,7 +8,9 @@
         public string FirstName { get; set; } = string.Empty;
         public string SecondName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-        public Boolean IsAdmin { get; set; } = false; // Später darf nur der Admin dies anpassen!!! Set-restriction
+        public string PasswordHash { get; set; } = string.Empty;
+        public UserRole Role { get; set; } = UserRole.User; // Später darf nur der Admin dies anpassen!!!
+        public bool IsEmailConfirmed { get; set; } = false; // Evt. vor Bestätigung keine Beschwrden einreichen können oä.
+        public bool IsActive { get; set; } = true;
     }
 }
