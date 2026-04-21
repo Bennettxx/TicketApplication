@@ -24,24 +24,22 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-bool disableAuthenticationForDevelopment = true; // Auf 'false' setzen für Produktion
-if (!disableAuthenticationForDevelopment)
-{
-    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddJwtBearer(options => 
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            options.TokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                ValidIssuer = builder.Configuration["Jwt:Issuer"],
-                ValidAudience = builder.Configuration["Jwt:Audience"],
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
-            };
-        });    
-}
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+        };
+    });
+
 builder.Services.AddAuthorization();
 
 // App-Objekt wird erstellt mit oben implementierten Var etc.
@@ -61,18 +59,21 @@ if (app.Environment.IsDevelopment())
 // Leitet HTTP Aufrufe als HTTPS weiter
 app.UseHttpsRedirection();
 
-if (disableAuthenticationForDevelopment)
+app.UseAuthentication();
+
+if (app.Environment.IsDevelopment())
 {
     app.Use(async (context, next) =>
     {
-        // Wir prüfen, ob im Header "Authorization: Dev-Admin" steht
         if (context.Request.Headers["Authorization"] == "Dev-Admin")
         {
-            // Wir "erfinden" einen Admin-User für diesen Aufruf
-            var claims = new[] {
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, "0"),
                 new Claim(ClaimTypes.Name, "DevAdmin"),
                 new Claim(ClaimTypes.Role, "Admin")
             };
+            // "DevAuth" als AuthenticationType macht IsAuthenticated = true
             var identity = new ClaimsIdentity(claims, "DevAuth");
             context.User = new ClaimsPrincipal(identity);
         }
@@ -80,11 +81,7 @@ if (disableAuthenticationForDevelopment)
     });
 }
 
-if (!disableAuthenticationForDevelopment)
-{
-    app.UseAuthentication(); // 1. Prüft den Token
-}
-app.UseAuthorization();  // 2. Prüft die Rollen
+app.UseAuthorization();
 
 // Hier werden die Controller-Routen aktiviert, damit die App auf HTTP-Anfragen reagieren kann
 app.MapControllers();

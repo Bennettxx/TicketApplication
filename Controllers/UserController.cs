@@ -24,68 +24,120 @@ namespace TicketApplication.Controllers
         }
 
         [HttpGet(Name = "GetUsers")]
-        //[Authorize(Roles = "Admin, Support")]
-        public async Task<ActionResult<IEnumerable<User>>> Get()
+        [Authorize(Roles = "Admin, Support")]
+        public async Task<ActionResult<IEnumerable<UserResponseDto>>> Get()
         {
-            // Wir fragen die DB asynchron ab und geben die Liste zurück
-            var users = await _context.Users.Where(u => u.IsActive).ToListAsync();
+            var users = await _context.Users
+                .Where(u => u.IsActive)
+                // Select() projiziert jedes User-Objekt in ein UserResponseDto
+                // So verlässt das PasswordHash niemals den Server
+                .Select(u => new UserResponseDto
+                {
+                    Id = u.Id,
+                    FirstName = u.FirstName,
+                    SecondName = u.SecondName,
+                    Email = u.Email,
+                    Role = u.Role.ToString(),  // Enum → lesbarer String (z.B. "Admin")
+                    IsEmailConfirmed = u.IsEmailConfirmed
+                })
+                .ToListAsync();
 
-            
             return Ok(users);
         }
 
         [HttpGet("{id}")]
-        //[Authorize(Roles = "Admin, Support")]
-        public async Task<ActionResult<User>> Get(int id)
+        [Authorize(Roles = "Admin, Support")]
+        public async Task<ActionResult<UserResponseDto>> Get(int id)
         {
-            // Wir fragen die DB asynchron ab und geben die Liste zurück
             var user = await _context.Users.FindAsync(id);
             if (user == null || !user.IsActive)
-            {
-                // NotFound() = 404 Statuscode
                 return NotFound();
-            }
-            
-            return Ok(user);
+
+            return Ok(new UserResponseDto
+            {
+                Id = user.Id,
+                FirstName = user.FirstName,
+                SecondName = user.SecondName,
+                Email = user.Email,
+                Role = user.Role.ToString(),
+                IsEmailConfirmed = user.IsEmailConfirmed
+            });
         }
 
         [HttpPost]
         [Authorize(Roles = "Admin")]
-        public async Task<ActionResult<User>> Post(User user)
+        public async Task<ActionResult<UserResponseDto>> Post(CreateUserDto dto)
         {
             bool emailExists = await _context.Users
-            .AnyAsync(u => u.Email == user.Email && u.IsActive == true);
+                .AnyAsync(u => u.Email == dto.Email && u.IsActive);
 
             if (emailExists)
-            {
-                // Augabe Fehler 400
                 return BadRequest("Diese Email-Adresse wird bereits verwendet.");
-            }
 
-            // Primary Key wird inkrementell von SQL DB vergeben und wirft Fehler wenn wir das manuell machen wollen
-            user.Id = 0;
-            // geht das so?
-            string passwordHash = BCrypt.Net.BCrypt.HashPassword(user.PasswordHash);
-            user.PasswordHash = passwordHash;
+            // Wir bauen den User selbst zusammen — der Caller hat keine Kontrolle über Id, IsActive etc.
+            var user = new User
+            {
+                FirstName = dto.FirstName,
+                SecondName = dto.SecondName,
+                Email = dto.Email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+                Role = dto.Role,
+                IsActive = true,
+                IsEmailConfirmed = false  // Admin-erstellte User müssen auch bestätigen
+            };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(Get), new { id = user.Id }, user);
+            // Wir geben ein UserResponseDto zurück, nicht den rohen User
+            return CreatedAtAction(nameof(Get), new { id = user.Id }, new UserResponseDto
+            {
+                Id = user.Id,
+                FirstName = user.FirstName,
+                SecondName = user.SecondName,
+                Email = user.Email,
+                Role = user.Role.ToString(),
+                IsEmailConfirmed = user.IsEmailConfirmed
+            });
         }
 
         [HttpPut("{id}")]
-        //[Authorize(Roles = "Admin")]
-        public async Task<IActionResult> Put(int id, User user)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Put(int id, UpdateUserDto dto)
         {
-            if (id != user.Id)
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+                return NotFound();
+
+            // Wir überschreiben nur die Felder die der Admin ändern darf
+            if (dto.FirstName != null)
             {
-                return BadRequest();
+                if (dto.FirstName.Trim() == string.Empty)
+                    return BadRequest("Vorname darf nicht leer sein.");
+                user.FirstName = dto.FirstName;
             }
+            if (dto.SecondName != null)
+            {
+                if (dto.SecondName.Trim() == string.Empty)
+                    return BadRequest("Nachname darf nicht leer sein.");
+                user.SecondName = dto.SecondName;
+            }
+            if (dto.Email != null)
+            {
+                if (dto.Email.Trim() == string.Empty)
+                    return BadRequest("E-Mail darf nicht leer sein.");
 
-            // Hier nur Änderungen durch den Admin gemeint, am eigenen Profil kann der User selbst Änderungen vornehmen, siehe AccountController
+                bool emailTaken = await _context.Users
+                    .AnyAsync(u => u.Email == dto.Email && u.Id != id && u.IsActive);
+                if (emailTaken)
+                    return BadRequest("Diese E-Mail-Adresse wird bereits verwendet.");
 
-            _context.Entry(user).State = EntityState.Modified;
+                user.Email = dto.Email;
+            }
+            if (dto.Role.HasValue) user.Role = dto.Role.Value;
+            if (dto.IsEmailConfirmed.HasValue) user.IsEmailConfirmed = dto.IsEmailConfirmed.Value;
+            if (dto.IsActive.HasValue) user.IsActive = dto.IsActive.Value;
+            // user.PasswordHash bleibt unberührt!
 
             try
             {
@@ -94,21 +146,11 @@ namespace TicketApplication.Controllers
             catch (DbUpdateConcurrencyException)
             {
                 if (!UserExists(id))
-                {
                     return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                throw;
             }
 
             return NoContent();
-        }
-
-        private bool UserExists(int id)
-        {
-            return _context.Users.Any(e => e.Id == id);
         }
 
         [HttpDelete("{id}")]
@@ -125,6 +167,11 @@ namespace TicketApplication.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        private bool UserExists(int id)
+        {
+            return _context.Users.Any(e => e.Id == id);
         }
     }
 }
