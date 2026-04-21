@@ -3,10 +3,15 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TicketApplication.Data;
+using TicketApplication.DTOs;
 using TicketApplication.Models;
 
 namespace TicketApplication.Controllers
 {
+    // Dieser Controller ist für die Verwaltung der User zuständig
+    // Er bietet Endpunkte für CRUD-Operationen (Create, Read, Update, Delete) auf User-Objekten
+    // Alle Endpunkte in diesem Controller haben die Basis-URL "api/user"
+    
     [Route("api/[controller]")]
     [ApiController]
     public class UserController : ControllerBase
@@ -19,6 +24,7 @@ namespace TicketApplication.Controllers
         }
 
         [HttpGet(Name = "GetUsers")]
+        //[Authorize(Roles = "Admin, Support")]
         public async Task<ActionResult<IEnumerable<User>>> Get()
         {
             // Wir fragen die DB asynchron ab und geben die Liste zurück
@@ -29,6 +35,7 @@ namespace TicketApplication.Controllers
         }
 
         [HttpGet("{id}")]
+        //[Authorize(Roles = "Admin, Support")]
         public async Task<ActionResult<User>> Get(int id)
         {
             // Wir fragen die DB asynchron ab und geben die Liste zurück
@@ -43,6 +50,7 @@ namespace TicketApplication.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<User>> Post(User user)
         {
             bool emailExists = await _context.Users
@@ -56,6 +64,9 @@ namespace TicketApplication.Controllers
 
             // Primary Key wird inkrementell von SQL DB vergeben und wirft Fehler wenn wir das manuell machen wollen
             user.Id = 0;
+            // geht das so?
+            string passwordHash = BCrypt.Net.BCrypt.HashPassword(user.PasswordHash);
+            user.PasswordHash = passwordHash;
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
@@ -64,6 +75,7 @@ namespace TicketApplication.Controllers
         }
 
         [HttpPut("{id}")]
+        //[Authorize(Roles = "Admin")]
         public async Task<IActionResult> Put(int id, User user)
         {
             if (id != user.Id)
@@ -71,7 +83,7 @@ namespace TicketApplication.Controllers
                 return BadRequest();
             }
 
-            // wir müssen später noch einbauen, dass man sein pw erst eingeben muss bevor man eine änderung eingeben kann
+            // Hier nur Änderungen durch den Admin gemeint, am eigenen Profil kann der User selbst Änderungen vornehmen, siehe AccountController
 
             _context.Entry(user).State = EntityState.Modified;
 
@@ -100,7 +112,7 @@ namespace TicketApplication.Controllers
         }
 
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]
+        //[Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
             var user = await _context.Users.FindAsync(id);

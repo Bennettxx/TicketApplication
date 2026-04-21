@@ -7,9 +7,15 @@ using System.Text;
 using TicketApplication.Data;
 using TicketApplication.Models;
 using BCrypt.Net;
+using TicketApplication.DTOs;
 
 namespace TicketApplication.Controllers
 {
+    // Controller für die Authentifizierung
+    // Route: api/auth/login
+    // POST Body: { "email": "", "password": "" }
+    // Antwort: { "token": "..." } oder 401 Unauthorized
+
     [Route("api/[controller]")]
     [ApiController]
     public class AuthController : ControllerBase
@@ -26,25 +32,74 @@ namespace TicketApplication.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
-            // 1. User suchen (muss aktiv sein!)
+            // User suchen (muss aktiv sein!)
             var user = await _context.Users
                 .FirstOrDefaultAsync(u => u.Email == loginDto.Email && u.IsActive);
 
             if (user == null) return Unauthorized("Ungültige E-Mail oder Passwort.");
 
-            // 2. Passwort prüfen (BCrypt vergleicht den Hash)
+            // E-Mail-Bestätigung prüfen
+            if (!user.IsEmailConfirmed)
+            { 
+                return Unauthorized("E-Mail-Adresse wurde nicht bestätigt."); 
+            }
+
+            // Passwort prüfen (BCrypt vergleicht den Hash)
             bool isValid = BCrypt.Net.BCrypt.Verify(loginDto.Password, user.PasswordHash);
             if (!isValid) return Unauthorized("Ungültige E-Mail oder Passwort.");
 
-            // 3. Token erstellen
+            // Token erstellen
             var token = CreateToken(user);
 
             return Ok(new { token = token });
         }
 
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] RegisterDto registerDto)
+        {
+            // Es können sich nur USER registrieren, Admins und Support müssen manuell angelegt werden
+            bool emailExists = await _context.Users.AnyAsync(u => u.Email == registerDto.Email && u.IsActive);
+
+            if (emailExists)
+            {
+                return BadRequest("Ein Benutzer mit dieser E-Mail-Adresse existiert bereits.");
+            }
+            
+            // Passwort hashen
+            string passwordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
+
+            var user = new User
+            {
+                Email = registerDto.Email,
+                PasswordHash = passwordHash,
+                Role = UserRole.User,
+                IsActive = true,
+                IsEmailConfirmed = false
+            };
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            return Ok();
+        }
+
+        [HttpGet("confirm")]
+        public async Task<IActionResult> ConfirmEmail([FromQuery] int userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null || !user.IsActive || user.IsEmailConfirmed)
+            {
+                return NotFound("Bestätigung nicht möglich.");
+            }
+
+            user.IsEmailConfirmed = true;
+            await _context.SaveChangesAsync();
+            return Ok("E-Mail-Adresse wurde bestätigt.");
+        }
+
         private string CreateToken(User user)
         {
-            // "Claims" sind die Infos, die im Ausweis stehen (Id, Email, Rolle)
+            // "Claims" sind die Infos die im Ausweis stehen (Id, Email, Rolle)
             var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
@@ -65,11 +120,5 @@ namespace TicketApplication.Controllers
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
-    }
-
-    public class LoginDto
-    {
-        public string Email { get; set; }
-        public string Password { get; set; }
     }
 }

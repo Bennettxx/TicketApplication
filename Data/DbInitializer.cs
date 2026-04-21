@@ -2,6 +2,11 @@
 
 namespace TicketApplication.Data
 {
+    // Diese Klasse wird in Program.cs aufgerufen, um die DB zu initialisieren
+    // Schritt 1: Prüfen ob DB da ist und Tabellen laut Schema anlegen
+    // Das Schema ergibt sich aus den DbSet-Variablen in ApplicationDbContext.cs
+    // Schritt 2: Prüfen ob die Tabelle leer ist und zB. einen Admin-User anlegen
+    // 
     public class DbInitializer
     {
         public static void Initialize(ApplicationDbContext context)

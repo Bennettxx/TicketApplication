@@ -4,7 +4,7 @@ namespace TicketApplication.Models
 {
     public class User
     {
-        public int Id { get; set; } // Primärschlüssel
+        public int Id { get; set; } = 0;// Primärschlüssel
         public string FirstName { get; set; } = string.Empty;
         public string SecondName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
