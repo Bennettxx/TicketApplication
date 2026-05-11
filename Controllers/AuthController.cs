@@ -38,10 +38,10 @@ namespace TicketApplication.Controllers
 
             if (user == null) return Unauthorized("Ungültige E-Mail oder Passwort.");
 
-            // E-Mail-Bestätigung prüfen
-            if (!user.IsEmailConfirmed)
-            { 
-                return Unauthorized("E-Mail-Adresse wurde nicht bestätigt."); 
+            // Freischaltung durch Admin prüfen
+            if (!user.IsActivated)
+            {
+                return Unauthorized("Konto wurde noch nicht durch einen Admin freigeschaltet.");
             }
 
             // Passwort prüfen (BCrypt vergleicht den Hash)
@@ -74,27 +74,13 @@ namespace TicketApplication.Controllers
                 PasswordHash = passwordHash,
                 Role = UserRole.User,
                 IsActive = true,
-                IsEmailConfirmed = false
+                IsActivated = false   // muss erst durch einen Admin freigeschaltet werden
             };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            return Ok();
-        }
-
-        [HttpGet("confirm")]
-        public async Task<IActionResult> ConfirmEmail([FromQuery] int userId)
-        {
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null || !user.IsActive || user.IsEmailConfirmed)
-            {
-                return NotFound("Bestätigung nicht möglich.");
-            }
-
-            user.IsEmailConfirmed = true;
-            await _context.SaveChangesAsync();
-            return Ok("E-Mail-Adresse wurde bestätigt.");
+            return Ok(new { message = "Registrierung eingegangen. Ein Admin wird dein Konto in Kürze freischalten." });
         }
 
         private string CreateToken(User user)

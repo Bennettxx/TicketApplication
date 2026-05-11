@@ -27,7 +27,7 @@ namespace TicketApplication.Data
                     Email = "admin@user.com",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
                     Role = UserRole.Admin,
-                    IsEmailConfirmed = true,
+                    IsActivated = true,
                     IsActive = true
                 };
                 context.Users.Add(adminUser);

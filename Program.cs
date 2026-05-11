@@ -6,18 +6,45 @@ using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using System.Diagnostics.Eventing.Reader;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using TicketApplication.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// =========================================================================
+// LOKALE KONFIGURATION
+// Lädt appsettings.Local.json zusätzlich zu appsettings.json.
+// Diese Datei steht in der .gitignore und enthält maschinenspezifische
+// Werte: Connection-String, JWT-Key. Gehört NICHT ins Repo.
+// =========================================================================
+builder.Configuration.AddJsonFile(
+    "appsettings.Local.json",
+    optional: true,
+    reloadOnChange: true);
+
+// JWT-Key prüfen — falls keiner gesetzt ist (z.B. beim allerersten Start),
+// einen kryptographisch sicheren generieren und in appsettings.Local.json
+// speichern. So bekommt jede Installation ihren eigenen einzigartigen Key.
+EnsureJwtKeyExists(builder);
+
+// Connection-String prüfen — sonst kommt später eine sehr kryptische
+// Fehlermeldung aus dem EF-Core-Innern.
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "ConnectionStrings:DefaultConnection ist nicht konfiguriert. " +
+        "Bitte 'appsettings.Local.json' anlegen — Vorlage: 'appsettings.Local.json.example'.");
+}
+
 // Add services to the container. Auch Dependency Injection genannt - welche Services stehen später zur Verfügung.
 
 // Hier binden wir die DB an die App, damit wir später in den Controllern darauf zugreifen können
-// connectionString holt sich die Verbindungsdaten aus der appsettings.json
 // DbContext ist die Klasse, die die DB abbildet und den Zugriff ermöglicht
 // Für debugging .LogTo(Console.WriteLine, LogLevel.Information)    Dieses später auskommentieren!
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString).LogTo(Console.WriteLine, LogLevel.Information));
 
@@ -100,3 +127,64 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+
+// =========================================================================
+// HILFSFUNKTIONEN
+// =========================================================================
+
+// Stellt sicher dass ein JWT-Signing-Key existiert.
+// Wenn keiner in der Konfiguration steht (z.B. allererster Start nach Klonen
+// des Repos), generieren wir einen kryptographisch sicheren Zufallswert und
+// speichern ihn in appsettings.Local.json. Jede lokale Installation bekommt
+// so automatisch ihren eigenen einzigartigen Schlüssel.
+static void EnsureJwtKeyExists(WebApplicationBuilder builder)
+{
+    var existingKey = builder.Configuration["Jwt:Key"];
+    if (!string.IsNullOrWhiteSpace(existingKey))
+        return;  // Key vorhanden — nichts zu tun.
+
+    // 32 Bytes = 256 Bits Entropie. In Hex codiert ergibt das 64 Zeichen.
+    // RandomNumberGenerator ist der OS-gestützte Krypto-Zufallsgenerator
+    // (NICHT das normale Random — das wäre für Sicherheitszwecke ungeeignet).
+    var randomBytes = new byte[32];
+    RandomNumberGenerator.Fill(randomBytes);
+    var newKey = Convert.ToHexString(randomBytes);
+
+    // appsettings.Local.json laden (falls vorhanden), den Jwt:Key setzen,
+    // wieder zurückschreiben. Wir merge'n — bestehende Werte wie der
+    // ConnectionString bleiben unangetastet.
+    var localJsonPath = Path.Combine(builder.Environment.ContentRootPath, "appsettings.Local.json");
+    JsonObject root;
+    if (File.Exists(localJsonPath))
+    {
+        var content = File.ReadAllText(localJsonPath);
+        root = string.IsNullOrWhiteSpace(content)
+            ? new JsonObject()
+            : JsonNode.Parse(content)!.AsObject();
+    }
+    else
+    {
+        root = new JsonObject();
+    }
+
+    if (root["Jwt"] is not JsonObject jwtSection)
+    {
+        jwtSection = new JsonObject();
+        root["Jwt"] = jwtSection;
+    }
+    jwtSection["Key"] = newKey;
+
+    var writeOptions = new JsonSerializerOptions { WriteIndented = true };
+    File.WriteAllText(localJsonPath, root.ToJsonString(writeOptions));
+
+    // Konfiguration neu laden, damit der frisch geschriebene Key sofort
+    // im laufenden builder.Configuration verfügbar ist.
+    ((IConfigurationRoot)builder.Configuration).Reload();
+
+    Console.WriteLine("================================================================");
+    Console.WriteLine(" Kein JWT-Schlüssel gefunden — ein neuer wurde generiert und in");
+    Console.WriteLine(" 'appsettings.Local.json' gespeichert.");
+    Console.WriteLine(" Diese Datei NICHT ins Git-Repo committen!");
+    Console.WriteLine("================================================================");
+}

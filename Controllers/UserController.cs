@@ -38,7 +38,7 @@ namespace TicketApplication.Controllers
                     SecondName = u.SecondName,
                     Email = u.Email,
                     Role = u.Role.ToString(),  // Enum → lesbarer String (z.B. "Admin")
-                    IsEmailConfirmed = u.IsEmailConfirmed
+                    IsActivated = u.IsActivated
                 })
                 .ToListAsync();
 
@@ -60,7 +60,7 @@ namespace TicketApplication.Controllers
                 SecondName = user.SecondName,
                 Email = user.Email,
                 Role = user.Role.ToString(),
-                IsEmailConfirmed = user.IsEmailConfirmed
+                IsActivated = user.IsActivated
             });
         }
 
@@ -83,7 +83,7 @@ namespace TicketApplication.Controllers
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 Role = dto.Role,
                 IsActive = true,
-                IsEmailConfirmed = false  // Admin-erstellte User müssen auch bestätigen
+                IsActivated = true  // Vom Admin angelegte User sind sofort freigeschaltet
             };
 
             _context.Users.Add(user);
@@ -97,7 +97,7 @@ namespace TicketApplication.Controllers
                 SecondName = user.SecondName,
                 Email = user.Email,
                 Role = user.Role.ToString(),
-                IsEmailConfirmed = user.IsEmailConfirmed
+                IsActivated = user.IsActivated
             });
         }
 
@@ -135,7 +135,7 @@ namespace TicketApplication.Controllers
                 user.Email = dto.Email;
             }
             if (dto.Role.HasValue) user.Role = dto.Role.Value;
-            if (dto.IsEmailConfirmed.HasValue) user.IsEmailConfirmed = dto.IsEmailConfirmed.Value;
+            if (dto.IsActivated.HasValue) user.IsActivated = dto.IsActivated.Value;
             if (dto.IsActive.HasValue) user.IsActive = dto.IsActive.Value;
             // user.PasswordHash bleibt unberührt!
 
@@ -153,8 +153,10 @@ namespace TicketApplication.Controllers
             return NoContent();
         }
 
+        // Soft-Delete: User werden NIE physisch aus der DB entfernt, nur deaktiviert (IsActive=false).
+        // Genutzt für: Ablehnung einer Registrierung ODER nachträgliche Sperrung eines aktiven Users.
         [HttpDelete("{id}")]
-        //[Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
             var user = await _context.Users.FindAsync(id);
@@ -164,6 +166,47 @@ namespace TicketApplication.Controllers
             }
 
             user.IsActive = false;
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        // GET /api/user/pending  →  Liste aller offenen Registrierungs-Anträge
+        // Sichtbar für Admin und Support; nur Admin darf tatsächlich freischalten (siehe Approve unten).
+        [HttpGet("pending")]
+        [Authorize(Roles = "Admin, Support")]
+        public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetPending()
+        {
+            var pending = await _context.Users
+                .Where(u => u.IsActive && !u.IsActivated)
+                .Select(u => new UserResponseDto
+                {
+                    Id = u.Id,
+                    FirstName = u.FirstName,
+                    SecondName = u.SecondName,
+                    Email = u.Email,
+                    Role = u.Role.ToString(),
+                    IsActivated = u.IsActivated
+                })
+                .ToListAsync();
+
+            return Ok(pending);
+        }
+
+        // POST /api/user/{id}/approve  →  Registrierung freischalten
+        // Nur Admin darf das.
+        [HttpPost("{id}/approve")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Approve(int id)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null || !user.IsActive)
+                return NotFound();
+
+            if (user.IsActivated)
+                return BadRequest("Dieser User ist bereits freigeschaltet.");
+
+            user.IsActivated = true;
             await _context.SaveChangesAsync();
 
             return NoContent();

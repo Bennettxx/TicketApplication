@@ -18,7 +18,7 @@ namespace TicketApplication.DTOs
         public string? Email { get; set; } = string.Empty;
 
         public UserRole? Role { get; set; } = UserRole.User;
-        public bool? IsEmailConfirmed { get; set; }
+        public bool? IsActivated { get; set; }
         public bool? IsActive { get; set; }
     }
 }
