@@ -38,7 +38,7 @@ namespace TicketApplication.Controllers
                 SecondName = user.SecondName,
                 Email = user.Email,
                 Role = user.Role.ToString(),
-                IsEmailConfirmed = user.IsEmailConfirmed
+                IsActivated = user.IsActivated
             });
         }
 
