@@ -1,0 +1,88 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Ticket System Login</title>
+    <style>
+        /*Hintergrund*/
+        body {
+            font-family: Arial; /*Schriftart für die  Seite*/
+            display: flex; /* mact unsere box flexibel*/
+            justify-content: center; /*Zentriert Login Fenster*/
+            background: #D3D3D3; /*unsere Farbe*/
+        }
+        /*Unsere wiße box*/
+        .box {
+            background: white;
+            padding: 65px; /*Abstand zu unseren eingabefeldern*/
+            border-radius: 15px; /* damit macht man die Ecken rund*/
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); /*Schatten*/
+            margin-top: 100px; /*Abstand des fensters vom oberen Rand*/
+        }
+
+        input {
+            display: block; /*macht dass Felder untereinander stehen*/
+            width: 100%; /*nutzt die gesamte Breite der weißen Box*/
+            margin: 10px 0; /*Abstand nach oben/unten*/
+            padding: 10px; /*Größe*/
+        }
+
+        button {
+            width: 111%;
+            padding: 10px; /*Dicke*/
+            background: #28a745;
+            color: white; /*Schriftfarbe auf dem button*/
+            border: dotted solid double dashed; /*Rahmen (kann man auf "none" setzen)*/
+            cursor: pointer; /*Zeigt eine Hand Mausanzeiger*/
+        }
+    </style>
+</head>
+<body>
+
+    <div class="box">
+        <h1>Login</h1>
+
+        <input type="text" id="emailInput" placeholder="Email">
+        <input type="password" id="passInput" placeholder="Password">
+
+        <button onclick="anmelden()">Einloggen</button>
+        <p id="feedback"></p>
+    </div>
+
+    <script>
+    async function anmelden() {
+        const email = document.getElementById('emailInput').value;
+        const pass = document.getElementById('passInput').value;
+        const feedback = document.getElementById('feedback');
+
+        try {
+            //
+            const response = await fetch('https://localhost:7203/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ Email: email, Password: pass })
+            });
+
+            if (response.ok) {
+                const daten = await response.json();
+
+                // Hier nutzen wir deine Rolllen
+                let rollenName = "";
+                if(daten.role === 0) rollenName = "Admin";
+                else if(daten.role === 1) rollenName = "Support";
+                else rollenName = "Normaler User";
+
+                feedback.innerHTML = `<span style="color:green">Erfolg! Angemeldet als: ${rollenName}</span>`;
+
+                // Wir speichern den Token für später
+                localStorage.setItem('meinToken', daten.token);
+            } else {
+                feedback.innerHTML = `<span style="color:red">Login falsch!</span>`;
+            }
+        } catch (e) {
+            feedback.innerHTML = `<span style="color:red">Fick dich!!!!!!!</span>`;
+        }
+    }
+    </script>
+
+</body>
+</html>

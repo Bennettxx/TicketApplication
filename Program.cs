@@ -11,6 +11,20 @@ using TicketApplication.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
+
+
+// CORS - Cross-Origin Resource Sharing konfigurieren:
+// das ist notwendig, damit  JS-Oberfläche (Frontend) 
+// auf die API (Backend) zugreifen darf, auch wenn sie auf unterschiedlichen Ports laufen
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 // Add services to the container. Auch Dependency Injection genannt - welche Services stehen später zur Verfügung.
 
 // Hier binden wir die DB an die App, damit wir später in den Controllern darauf zugreifen können
@@ -58,6 +72,15 @@ if (app.Environment.IsDevelopment())
 
 // Leitet HTTP Aufrufe als HTTPS weiter
 app.UseHttpsRedirection();
+app.UseDefaultFiles(); // Sucht automatisch nach der index.html
+app.UseStaticFiles();  // Erlaubt das Ausliefern von HTML/CSS/JS
+   
+
+// Aktiviert oben definierte CORS-Regel "AllowAll"
+// Muss vor app.UseAuthentication() stehen, damit der Browser die Erlaubnis 
+// bekommt bevor er versucht sich einzuloggen.
+app.UseCors("AllowAll");
+app.UseStaticFiles();
 
 app.UseAuthentication();
 
