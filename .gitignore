@@ -14,6 +14,9 @@
 # Vorlage steht in appsettings.Local.json.example
 appsettings.Local.json
 
+# Persönliche Lern-Doku — nur für mich lokal, nicht für GitHub
+README_CLAUDE.md
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 

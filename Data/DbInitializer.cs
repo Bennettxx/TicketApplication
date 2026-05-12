@@ -1,17 +1,20 @@
-﻿using TicketApplication.Models;
+﻿using Microsoft.EntityFrameworkCore;
+using TicketApplication.Models;
 
 namespace TicketApplication.Data
 {
     // Diese Klasse wird in Program.cs aufgerufen, um die DB zu initialisieren
     // Schritt 1: Prüfen ob DB da ist und Tabellen laut Schema anlegen
-    // Das Schema ergibt sich aus den DbSet-Variablen in ApplicationDbContext.cs
-    // Schritt 2: Prüfen ob die Tabelle leer ist und zB. einen Admin-User anlegen
-    // 
+    //            Das Schema ergibt sich aus den DbSet-Variablen in ApplicationDbContext.cs
+    // Schritt 2: Prüfen ob bestimmte Tabellen leer sind und Default-Daten
+    //            anlegen (z.B. Standard-Admin-User).
     public class DbInitializer
     {
         public static void Initialize(ApplicationDbContext context)
         {
-            // Prüfen ob DB da ist und Tabellen laut Schema anlegen
+            // Legt die DB inkl. aller Tabellen an, falls sie noch nicht existiert.
+            // Bei bestehenden DBs passiert nichts — Schema-Änderungen werden NICHT automatisch eingespielt.
+            // Wenn das Model erweitert wird, muss die lokale DB einmal gelöscht werden.
             context.Database.EnsureCreated();
 
             // Hier könnte später Schritt 2 folgen: 
