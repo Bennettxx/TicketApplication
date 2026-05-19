@@ -1,0 +1,128 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Ticket System</title>
+    <style>
+
+        body {
+            font-family: Arial;
+            display: flex; /* Sidebar und Hauptbereich nebeneinander */
+            margin: 0;
+            background: #D3D3D3;
+        }
+
+        /* Linke Navigationsleiste */
+        .sidebar {
+            width: 220px;
+            background: #2c3e50;
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+
+            /* Titel der Sidebar */
+            .sidebar h2 {
+                color: white;
+                margin-bottom: 30px; /* Abstand zum ersten Menüpunkt */
+            }
+
+            /* Jeder Menüpunkt in der Sidebar */
+            .sidebar a {
+                display: block; /* Jeder Link in einer eigenen Zeile */
+                color: white;
+                text-decoration: none; /*  Unterstrich */
+                padding: 10px;
+                margin: 5px 0;
+                border-radius: 8px; /*  Ecken rund */
+            }
+
+                /* wenn man mit Maus drüberfährt */
+                .sidebar a:hover {
+                    background: #34495e;
+                }
+
+        /* Hauptbereich */
+        .main {
+            flex: 1; /* Nimmt den restlichen Platz ein */
+            padding: 30px;
+        }
+
+            .main h1 {
+                margin-top: 0;
+            }
+
+
+
+        /* Benutzername  */
+        .benutzer {
+            position: absolute; 
+            top: 15px;
+            right: 20px; 
+            background: white;
+            padding: 7px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        
+    </style>
+</head>
+<body>
+
+    <!-- Linke Navigationsleiste mit Menüpunkten -->
+    <div class="sidebar">
+        <h2>Ticket System</h2>
+        <!-- Jeder Link führt später zu einer eigenen Seite; # wird dann mit weiteren Seiten ersetzt -->
+        <a href="#"> Meine Tickets</a>  <!-- a: macht das Button anklickbar -->
+        <a href="#"> Ticket erstellen</a>
+        <a href="/problem-melden.html"> Problem melden</a>
+
+        <a href="#" onclick="abmelden()"> Abmelden</a>
+    </div>
+
+    <!-- Hauptbereich: hier werden die Tickets angezeigt -->
+    <div class="main">
+
+        <!-- Benutzername   -->
+        <span class="benutzer" id="benutzername">...</span>
+
+        <h1>Meine Tickets</h1>
+        <p>Hier werden die Tickets angezeigt...</p>
+    </div>
+
+    <script>
+        // Beim Laden der Seite prüfen ob der User eingeloggt ist
+        // Wenn kein Token vorhanden ist, wird er zurück zum Login geschickt
+        const token = localStorage.getItem('meinToken');
+        if (!token) {
+            window.location.href = '/index.html';
+        }
+        // Benutzername oben rechts laden
+        async function benutzerLaden() {
+            try {
+                const response = await fetch('/api/user/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const ich = await response.json();
+
+                // Email als Benutzername anzeigen
+                document.getElementById('benutzername').innerText = ` ${ich.email}`;
+            } catch (e) {
+                console.error('Fehler beim Laden des Benutzers', e);
+            }
+        }
+
+        // Beim Laden der Seite Benutzername holen
+        benutzerLaden();
+
+        // Abmelden: Token löschen und zurück zum Login
+        function abmelden() {
+            localStorage.removeItem('meinToken');
+            window.location.href = '/index.html';
+        }
+    </script>
+
+</body>
+</html>

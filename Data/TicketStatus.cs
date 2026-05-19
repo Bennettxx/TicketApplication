@@ -6,6 +6,6 @@
         InProgress = 1,
         Waiting = 2,
         Closed = 3,
-        //ReOpened = 4
+        ReOpened = 4
     }
 }

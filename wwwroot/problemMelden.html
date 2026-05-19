@@ -1,0 +1,283 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Problem melden</title>
+    <style>
+        
+        body {
+            font-family: Arial;
+            display: flex;
+            margin: 0;
+            background: #D3D3D3;
+        }
+
+        
+        .sidebar {
+            width: 220px;
+            background: #2c3e50;
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+
+            .sidebar h2 {
+                color: white;
+                margin-bottom: 30px;
+            }
+
+            .sidebar a {
+                display: block;
+                color: white;
+                text-decoration: none;
+                padding: 10px;
+                margin: 5px 0;
+                border-radius: 8px;
+            }
+
+                .sidebar a:hover {
+                    background: #34495e;
+                }
+
+        /* Hauptbereich  */
+        .main {
+            flex: 1;
+            padding: 30px;
+        }
+
+        /* Weiße Karte mit dem Formular */
+        .karte {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            max-width: 600px;
+        }
+
+        /* Beschriftung über Eingabefeld */
+        label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        /* Alle Eingabefelder gleich */
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-family: Arial;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        /* Beschreibungsfeld etwas größer */
+        textarea {
+            height: 120px;
+            resize: vertical;
+        }
+
+        /* Ticketnummer-Feld – standardmäßig versteckt */
+        /* Wird nur sichtbar wenn User "Problem mit Ticket" auswählt */
+        #ticketnummerBereich {
+            display: none;
+        }
+
+        /* Absenden-Button */
+        .btn-senden {
+            margin-top: 20px;
+            width: 100%;
+            padding: 12px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+            .btn-senden:hover {
+                background: #218838;
+            }
+
+        #feedback {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    
+    <div class="sidebar">
+        <h2>Ticket System</h2>
+       
+        <a href="#"> Meine Tickets</a> 
+        <a href="#"> Ticket erstellen</a>
+        <a href="/problem-melden.html"> Problem melden</a>
+
+        <a href="#" onclick="abmelden()"> Abmelden</a>
+    </div>
+
+    
+    <div class="main">
+        <h1>Problem melden</h1>
+        <p>Hier kannst du den Support kontaktieren.</p>
+
+        <div class="karte">
+
+            <!-- Problemtyp auswählen -->
+            <!-- onchange="typGeaendert()" ruft die Funktion auf wenn User etwas auswählt -->
+            <label>Art des Problems</label>
+            <select id="typInput" onchange="typGeaendert()">
+                <option value="">Bitte wählen</option>
+                <option value="Technisch">Technisches Problem (z.B. Seite lädt nicht)</option>
+                <option value="Ticket">Problem mit einem Ticket</option>
+                <option value="Frage">Frage / Allgemeine Anfrage</option>
+            </select>
+            <!-- Ticketnummer - nur sichtbar wenn "Problem mit Ticket" gewählt wird -->
+            <div id="ticketnummerBereich">
+                <label>Ticketnummer</label>
+                <input type="text" id="ticketnummerInput" placeholder="z.B. 1042">
+            </div>
+
+            <!-- Priorität -->
+            <label>Priorität</label>
+            <select id="prioritaetInput">
+                <option value="">Bitte wählen</option>
+                <option value="Niedrig">Niedrig – kann warten</option>
+                <option value="Mittel">Mittel – bald lösen</option>
+                <option value="Hoch">Hoch – dringend</option>
+            </select>
+
+            <!-- Beschreibung -->
+            <label>Beschreibung</label>
+            <textarea id="beschreibungInput" placeholder="Beschreibe das Problem so genau wie möglich..."></textarea>
+
+            <!-- Absenden -->
+            <button class="btn-senden" onclick="senden()">An Support senden</button>
+
+            <!-- Erfolgs- oder Fehlermeldung -->
+            <p id="feedback"></p>
+
+        </div>
+    </div>
+
+    <script>
+        // Beim Laden der Seite prüfen ob der User eingeloggt ist
+        const token = localStorage.getItem('meinToken');
+        if (!token) {
+            window.location.href = '/index.html';
+        }
+
+        // Wird aufgerufen wenn der User den Problemtyp ändert
+        // Zeigt das Ticketnummer-Feld nur wenn "Problem mit Ticket" gewählt wurde
+        function typGeaendert() {
+            const typ = document.getElementById('typInput').value;
+            const ticketnummerBereich = document.getElementById('ticketnummerBereich');
+
+            if (typ === 'Ticket') {
+                // Ticketnummer-Feld einblenden
+                ticketnummerBereich.style.display = 'block';
+            } else {
+                // Ticketnummer-Feld ausblenden und leeren
+                ticketnummerBereich.style.display = 'none';
+                document.getElementById('ticketnummerInput').value = '';
+            }
+        }
+
+        // Wird aufgerufen wenn der User auf "An Support senden" klickt
+        async function senden() {
+            const feedback = document.getElementById('feedback');
+
+            // Alle Eingaben auslesen // Speichern in einer Variable für später
+            const typ          = document.getElementById('typInput').value;
+            const ticketnummer = document.getElementById('ticketnummerInput').value;
+            const prioritaet   = document.getElementById('prioritaetInput').value;
+            const beschreibung = document.getElementById('beschreibungInput').value;
+
+            // Pflichtfelder prüfen
+            if (!typ || !prioritaet || !beschreibung) {
+                feedback.innerHTML = `<span style="color:red">Bitte alle Felder ausfüllen!</span>`;
+                return; // Hier stoppen, nichts absenden
+            }
+
+            // Wenn "Problem mit Ticket" gewählt wurde muss die Ticketnummer angegeben sein
+            if (typ === 'Ticket' && !ticketnummer) {
+                feedback.innerHTML = `<span style="color:red">Bitte die Ticketnummer angeben!</span>`;
+                return;
+            }
+
+            try {
+                // Daten ans Backend schicken
+                const response = await fetch('/api/ticket', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        // Titel wird automatisch aus Typ und Beschreibung zusammengebaut
+                        title: `[${typ}] ${ticketnummer ? 'Ticket #' + ticketnummer + ' – ' : ''}${beschreibung.substring(0, 80)}`,
+
+                        // Beschreibung enthält alle Details
+                        description: `Typ: ${typ}\n${ticketnummer ? 'Ticketnummer: ' + ticketnummer + '\n' : ''}Priorität: ${prioritaet}\n\nBeschreibung:\n${beschreibung}`,
+
+                        // Priorität umwandeln in Enum-Zahl
+                        priority: prioritaetZuEnum(prioritaet),
+
+                        // Kategorie – problem-melden ist immer SystemProblem oder Frage
+                        category: typZuKategorie(typ)
+                    })
+                });
+
+                if (response.ok) {
+                    // Erfolgsmeldung anzeigen
+                    feedback.innerHTML = `<span style="color:green"> Deine Anfrage wurde an den Support gesendet!</span>`;
+                    // Alle Felder leeren
+                    document.getElementById('typInput').value = '';
+                    document.getElementById('prioritaetInput').value = '';
+                    document.getElementById('beschreibungInput').value = '';
+                    document.getElementById('ticketnummerBereich').style.display = 'none';
+                } else {
+                    feedback.innerHTML = `<span style="color:red">Fehler beim Senden!</span>`;
+                }
+
+            } catch (e) {
+                // Backend nicht erreichbar
+                feedback.innerHTML = `<span style="color:red">Server nicht erreichbar!</span>`;
+            }
+        }
+
+        // Abmelden: Token löschen und zurück zum Login
+        function abmelden() {
+            localStorage.removeItem('meinToken');
+            window.location.href = '/index.html';
+        }
+
+
+
+        // Wandelt  Priorität in Enum-Zahl um
+        // niedriug = 0, mittel = 1, hoch = 2
+        function prioritaetZuEnum(prioritaet) {
+            if (prioritaet === 'Niedrig') return 0;  // 
+            if (prioritaet === 'mittel') return 1;  // 
+            if (prioritaet === 'hoch') return 2;  // 
+            return 0;
+        }
+
+
+        // Wandelt den Problemtyp in eine Kategorie um
+        // Normal = 0, SystemProblem = 1, Frage = 2
+        function typZuKategorie(typ) {
+            if (typ === 'Technisch') return 1;  // SystemProblem
+            if (typ === 'Ticket') return 1;  // SystemProblem
+            if (typ === 'Frage') return 2;  // Frage
+            return 1;                           // Standard: SystemProblem
+        }
+    </script>
+
+</body>
+</html>
