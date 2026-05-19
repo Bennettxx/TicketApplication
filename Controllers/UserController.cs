@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using TicketApplication.Data;
 using TicketApplication.DTOs;
 using TicketApplication.Models;
@@ -22,6 +23,21 @@ namespace TicketApplication.Controllers
         {
             _context = context;
         }
+
+
+        [HttpGet("me")]
+        [Authorize]
+        public IActionResult GetMe()
+        {
+            var rolle = User.FindFirstValue(ClaimTypes.Role);
+            var email = User.FindFirstValue(ClaimTypes.Email);
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            return Ok(new { userId, email, rolle });
+        }
+
+
+
 
         [HttpGet(Name = "GetUsers")]
         [Authorize(Roles = "Admin, Support")]

@@ -9,7 +9,7 @@ namespace TicketApplication.Models
         public int? AssignedToId { get; set; }
         public TicketStatus Status { get; set; } = TicketStatus.Open;
         public TicketPriority Priority { get; set; } = TicketPriority.Low;
-
+        public TicketCategory Category { get; set; } = TicketCategory.Normal;
 
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;

@@ -11,6 +11,7 @@ namespace TicketApplication.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class TicketController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -34,6 +35,7 @@ namespace TicketApplication.Controllers
                 Title = dto.Title,
                 Description = dto.Description,
                 Priority = dto.Priority,
+                Category = dto.Category,
                 Status = TicketStatus.Open,
                 CreatedByUserId = userId,
                 AssignedToId = null,       // Zuweisung kommt in Stufe 3 ueber Tags
@@ -145,6 +147,7 @@ namespace TicketApplication.Controllers
             Description = t.Description,
             Status = t.Status.ToString(),
             Priority = t.Priority.ToString(),
+            Category = t.Category.ToString(),
             CreatedByUserId = t.CreatedByUserId,
             AssignedToUserId = t.AssignedToId,
             CreatedAt = t.CreatedAt,
