@@ -1,9 +1,11 @@
-﻿using TicketApplication.Data;
+﻿using System.ComponentModel.DataAnnotations;
+using TicketApplication.Data;
 
 namespace TicketApplication.Models
 {
     public class User
     {
+        [Key]
         public int Id { get; set; } = 0;// Primärschlüssel
         public string FirstName { get; set; } = string.Empty;
         public string SecondName { get; set; } = string.Empty;

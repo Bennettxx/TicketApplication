@@ -1,4 +1,6 @@
-﻿namespace TicketApplication.Models
+﻿using TicketApplication.Data;
+
+namespace TicketApplication.Models
 {
     public class TicketDialogue
     {

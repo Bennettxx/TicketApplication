@@ -13,5 +13,11 @@ namespace TicketApplication.DTOs
         public string Description { get; set; } = string.Empty;
 
         public TicketPriority Priority { get; set; } = TicketPriority.Low;
+
+        public int? AdditionalUserId1 { get; set; }
+        public int? AdditionalUserId2 { get; set; }
+        public int? AdditionalUserId3 { get; set; }
+
+
     }
 }

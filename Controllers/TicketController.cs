@@ -11,6 +11,7 @@ namespace TicketApplication.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class TicketController : ControllerBase
     {
         private readonly ApplicationDbContext _context;

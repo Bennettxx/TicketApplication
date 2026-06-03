@@ -18,6 +18,10 @@ namespace TicketApplication.Models
 
         // Veränderlicher Ticketinhalt
         public TicketStatus Status { get; set; } = TicketStatus.Open;
+        public int? AdditionalUserId1 { get; set; }
+        public int? AdditionalUserId2 { get; set; }
+        public int? AdditionalUserId3 { get; set; }
+
 
         public DateTime UpdatedAt { get; set; }
         public DateTime? ClosedAt { get; set; }
