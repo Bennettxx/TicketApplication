@@ -33,6 +33,14 @@ namespace TicketApplication.Data
                       .WithMany()
                       .HasForeignKey(t => t.Id);
             });
+            modelBuilder.Entity<TicketDialogue>(entity =>
+            {
+                entity.HasKey(t => new { t.Id, t.TicketDialogueId });
+
+                entity.HasOne<Ticket>()
+                      .WithMany()
+                      .HasForeignKey(t => t.Id);
+            });
         }
 
     }

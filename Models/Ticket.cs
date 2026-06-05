@@ -14,14 +14,19 @@ namespace TicketApplication.Models
         public TicketPriority Priority { get; set; } = TicketPriority.Low;
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public string ExpectedResult { get; set; } = string.Empty;
+        public string ActualResult { get; set; } = string.Empty;
+        public bool AgreedBilling { get; set; } = false;
+        public bool AgreedAGB { get; set; } = false;
+
 
         // Nachträglich veränderlicher Ticketinhalt
         public TicketStatus Status { get; set; } = TicketStatus.Open;
         public int? AdditionalUserId1 { get; set; }
         public int? AdditionalUserId2 { get; set; }
         public int? AdditionalUserId3 { get; set; }
-        public int DepartmentId { get; set; }
-        public int SubjectId { get; set; }
+        public int DepartmentId { get; set; } // Nicht durch User änderbar
+        public int SubjectId { get; set; } // Nicht durch User änderbar
 
 
         // Autom. angepasste Werte
