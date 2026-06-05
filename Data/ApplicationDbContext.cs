@@ -17,7 +17,10 @@ namespace TicketApplication.Data
         public DbSet<Ticket> Tickets { get; set; }
         public DbSet<TicketDialogue> TicketDialogue { get; set; }
         public DbSet<TicketTransactions> TicketTransactions { get; set; }
+        public DbSet<Department> Departments { get; set; }
 
+
+        // PKs festlegen - sofern es nicht "nur" die ID ist (wird autom. erkannt)
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

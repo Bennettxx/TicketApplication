@@ -3397,23 +3397,23 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\LocalAdmin\\.nuget\\packages\\": {},
+    "C:\\Users\\bennett.piel\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\LocalAdmin\\source\\repos\\Bennettxx\\TicketApplication\\TicketApplication.csproj",
+      "projectUniqueName": "C:\\Users\\bennett.piel\\source\\repos\\Bennettxx\\TicketApplication\\TicketApplication.csproj",
       "projectName": "TicketApplication",
-      "projectPath": "C:\\Users\\LocalAdmin\\source\\repos\\Bennettxx\\TicketApplication\\TicketApplication.csproj",
-      "packagesPath": "C:\\Users\\LocalAdmin\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\LocalAdmin\\source\\repos\\Bennettxx\\TicketApplication\\obj\\",
+      "projectPath": "C:\\Users\\bennett.piel\\source\\repos\\Bennettxx\\TicketApplication\\TicketApplication.csproj",
+      "packagesPath": "C:\\Users\\bennett.piel\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\bennett.piel\\source\\repos\\Bennettxx\\TicketApplication\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
       ],
       "configFilePaths": [
-        "C:\\Users\\LocalAdmin\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\bennett.piel\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
@@ -3422,6 +3422,7 @@
       ],
       "sources": {
         "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+        "C:\\Program Files\\dotnet\\library-packs": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -3935,7 +3936,7 @@
       "code": "NU1510",
       "level": "Warning",
       "warningLevel": 1,
-      "message": "PackageReference Microsoft.AspNetCore.Authorization will not be pruned. Consider removing this package from your dependencies, as it is likely unnecessary.",
+      "message": "PackageReference Microsoft.AspNetCore.Authorization wird nicht gekürzt. Erwägen Sie, dieses Paket aus Ihren Abhängigkeiten zu entfernen, da es wahrscheinlich nicht erforderlich ist.",
       "libraryId": "Microsoft.AspNetCore.Authorization",
       "targetGraphs": [
         "net10.0"
