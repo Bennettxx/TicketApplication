@@ -18,6 +18,7 @@ namespace TicketApplication.Data
         public DbSet<TicketDialogue> TicketDialogue { get; set; }
         public DbSet<TicketTransactions> TicketTransactions { get; set; }
         public DbSet<Department> Departments { get; set; }
+        public DbSet<Subject> Subjects { get; set; }
 
 
         // PKs festlegen - sofern es nicht "nur" die ID ist (wird autom. erkannt)

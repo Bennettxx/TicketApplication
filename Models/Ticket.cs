@@ -25,8 +25,8 @@ namespace TicketApplication.Models
         public int? AdditionalUserId1 { get; set; }
         public int? AdditionalUserId2 { get; set; }
         public int? AdditionalUserId3 { get; set; }
-        public int DepartmentId { get; set; } // Nicht durch User änderbar
-        public int SubjectId { get; set; } // Nicht durch User änderbar
+        public int DepartmentId { get; set; } // Nachträglich nicht durch User änderbar
+        public int SubjectId { get; set; } // Nachträglich nicht durch User änderbar
 
 
         // Autom. angepasste Werte
