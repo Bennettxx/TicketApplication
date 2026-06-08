@@ -8,7 +8,7 @@ namespace TicketApplication.Models
         public int Id { get; set; } // Primärschlüssel
         public int TicketId { get; set; }
         public int CreatedByUserId { get; set; }
-        //
+        // Nur durch Support/Admin änderbar
         public int? AssignedToId { get; set; }
         // Nachträglich unveränderlicher Ticketinhalt
         public TicketPriority Priority { get; set; } = TicketPriority.Low;

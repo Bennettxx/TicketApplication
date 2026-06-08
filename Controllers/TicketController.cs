@@ -30,16 +30,79 @@ namespace TicketApplication.Controllers
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
+            int? additionalUserId1 = null;
+            int? additionalUserId2 = null;
+            int? additionalUserId3 = null;
+            if (dto.AssignedUserMail1 != null)
+            {
+                additionalUserId1 = await _context.Users
+                    .Where(u => u.Email == dto.AssignedUserMail1)
+                    .Select(u => u.Id)
+                    .FirstAsync();
+            }
+            if (dto.AssignedUserMail2 != null)
+            {
+                additionalUserId2 = await _context.Users
+                    .Where(u => u.Email == dto.AssignedUserMail2)
+                    .Select(u => u.Id)
+                    .FirstAsync();
+            }
+            if (dto.AssignedUserMail3 != null)
+            {
+                additionalUserId3 = await _context.Users
+                    .Where(u => u.Email == dto.AssignedUserMail3)
+                    .Select(u => u.Id)
+                    .FirstAsync();
+            }
+
+            int departmentId;
+            departmentId = await _context.Departments
+                .Where(d => d.Name == dto.DepartmentName)
+                .Select(d => d.Id)
+                .FirstAsync();
+            var subjectExists = await _context.Subjects
+                .AnyAsync(s => s.Title == dto.SubjectName);
+            int subjectId;
+            if (subjectExists)
+            {
+                subjectId = await _context.Subjects
+                    .Where(s => s.Title == dto.SubjectName)
+                    .Select(s => s.Id)
+                    .FirstAsync();
+            }
+            else 
+            {
+                var subject = new Subject
+                {
+                    Title = dto.SubjectName,
+                    DepartmentId = departmentId,
+                    IsVerified = false
+                };
+                _context.Subjects.Add(subject);
+                await _context.SaveChangesAsync();
+                subjectId = subject.Id;
+            }
+
             var ticket = new Ticket
             {
+                Priority = dto.Priority,
                 Title = dto.Title,
                 Description = dto.Description,
-                Priority = dto.Priority,
+                ExpectedResult = dto.ExpectedResult,
+                ActualResult = dto.ActualResult,
+                AgreedBilling = dto.AgreedBilling,
+                AgreedAGB = dto.AgreedAGB,
                 Status = TicketStatus.Open,
+                AdditionalUserId1 = additionalUserId1,
+                AdditionalUserId2 = additionalUserId2,
+                AdditionalUserId3 = additionalUserId3,
                 CreatedByUserId = userId,
+                DepartmentId = departmentId,
+                SubjectId = subjectId,
                 AssignedToId = null,       // Zuweisung kommt in Stufe 3 ueber Tags
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
+
             };
 
             _context.Tickets.Add(ticket);
