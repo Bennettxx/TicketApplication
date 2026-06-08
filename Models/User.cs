@@ -16,6 +16,9 @@ namespace TicketApplication.Models
         // IsActivated: Wird beim Register auf false gesetzt. Ein Admin muss das Konto manuell freischalten.
         public bool IsActivated { get; set; } = false;
 
+        // Angehöriger welcher Abteilung (nur für Support/Admin relevant)
+        public int? DepartmentId { get; set; }
+
         // IsActive: Soft-Delete-Flag. Wird auf false gesetzt wenn ein Admin den User "ablehnt" oder deaktiviert.
         // WICHTIG: User werden NIE aus der DB gelöscht, nur deaktiviert!
         public bool IsActive { get; set; } = true;

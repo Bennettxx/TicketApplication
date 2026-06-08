@@ -1,11 +1,12 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Net.Sockets;
 using System.Security.Claims;
 using TicketApplication.Data;
 using TicketApplication.DTOs;
 using TicketApplication.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace TicketApplication.Controllers
 {
@@ -150,11 +151,9 @@ namespace TicketApplication.Controllers
             return Ok(ToDto(ticket));
         }
 
-        // PUT /api/ticket/{id}  -> Workflow-Felder aendern
-        // Nur Support/Admin. Title und Description sind nicht im DTO -
-        // also unveraenderlich.
-        [HttpPut("{id}")]
-        [Authorize(Roles = "Admin, Support")]
+        // PATCH /api/ticket/{id}  -> Ticket aktualisieren (was leer ist, wird beibehalten).
+        // Rolle entscheidet darüber, was geändert werden darf
+        [HttpPatch("{id}")]
         public async Task<IActionResult> Update(int id, UpdateTicketDto dto)
         {
             var ticket = await _context.Tickets.FindAsync(id);
@@ -201,6 +200,39 @@ namespace TicketApplication.Controllers
             return NoContent();
         }
 
+        // PATCH /api/ticket/{id}/status
+        [HttpPatch("{id}/status")]
+        public async Task<IActionResult> UpdateStatus(int id, UpdateTicketStatusDTO dto)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var role = User.FindFirstValue(ClaimTypes.Role);
+            var ticket = await _context.Tickets.FindAsync(id);
+            if (ticket == null) return NotFound();
+
+            if (role != "Admin" && role != "Support" && ticket.CreatedByUserId != userId)
+            {
+                return Forbid();
+            }
+
+            if (ticket.Status == dto.Status)
+                return Ok();
+                        
+            ticket.Status = dto.Status;
+            if (dto.Status == TicketStatus.Open)
+            { 
+                ticket.OpenedAt =  DateTime.UtcNow;
+                ticket.UpdatedAt = DateTime.UtcNow;
+            }
+            else if (dto.Status == TicketStatus.Closed)
+            {
+                ticket.ClosedAt = DateTime.UtcNow;
+                ticket.UpdatedAt = DateTime.UtcNow;
+            }
+            await _context.SaveChangesAsync();
+            return Ok();
+            
+        }
+        
         // Hilfsmethode: Ticket-Entity -> Response-DTO
         private static TicketResponseDto ToDto(Ticket t) => new TicketResponseDto
         {
