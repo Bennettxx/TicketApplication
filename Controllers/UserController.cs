@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using TicketApplication.Data;
 using TicketApplication.DTOs;
 using TicketApplication.Models;
+// using System.Security.Claims;
 
 namespace TicketApplication.Controllers
 {
@@ -22,6 +23,21 @@ namespace TicketApplication.Controllers
         {
             _context = context;
         }
+
+        // Der Benutzername wird auf der startseite.html oben rechts
+        // nicht angezeigt weil  GET /api/user/me fehlt.
+        //
+        // [HttpGet("me")]
+        // [Authorize]
+        // public IActionResult GetMe()
+        // {
+        //     var rolle  = User.FindFirstValue(ClaimTypes.Role);
+        //     var email  = User.FindFirstValue(ClaimTypes.Email);
+        //     var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        //     return Ok(new { userId, email, rolle });
+        // }
+        
+
 
         [HttpGet(Name = "GetUsers")]
         [Authorize(Roles = "Admin, Support")]

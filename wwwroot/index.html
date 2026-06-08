@@ -66,6 +66,7 @@
                 const daten = await response.json();
 
                 localStorage.setItem('meinToken', daten.token);
+                window.location.href = '/startseite.html';
             } else {
                 feedback.innerHTML = `<span style="color:red">Login falsch!</span>`;
             }

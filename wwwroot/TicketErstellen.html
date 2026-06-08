@@ -1,0 +1,838 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Ticket erstellen</title>
+    <style>
+        /* Grundlayout */
+        body {
+            font-family: Arial;
+            display: flex;
+            margin: 0;
+            background: #D3D3D3;
+        }
+
+        /* Linke Sidebar */
+        .sidebar {
+            width: 220px;
+            background: #2c3e50;
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+        }
+
+            .sidebar h2 {
+                color: white;
+                margin-bottom: 30px;
+            }
+
+            .sidebar a {
+                display: block;
+                color: white;
+                text-decoration: none;
+                padding: 10px;
+                margin: 5px 0;
+                border-radius: 8px;
+            }
+
+                .sidebar a:hover {
+                    background: #34495e;
+                }
+
+            .sidebar .abmelden {
+                margin-top: auto;
+            }
+
+        /* Hauptbereich */
+        .main {
+            flex: 1;
+            padding: 30px;
+        }
+
+        /* Benutzername oben rechts */
+        .benutzer {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: white;
+            padding: 7px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        /* Weiße Karte */
+        .karte {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            min-height: 500px;
+        }
+
+        /* Linke Schritte-Leiste */
+        .schritte {
+            width: 180px;
+            background: #f5f5f5;
+            border-radius: 15px 0 0 15px;
+            padding: 20px;
+        }
+
+        /* Einzelner Schritt in der linken Leiste */
+        .schritt {
+            padding: 12px 10px;
+            margin: 5px 0;
+            border-radius: 8px;
+            color: gray;
+            font-size: 14px;
+            cursor: default;
+        }
+
+        
+
+            /* Aktiver Schritt – wird hervorgehoben */
+            .schritt.aktiv {
+                background: #2c3e50;
+                color: white;
+                font-weight: bold;
+            }
+
+           
+
+        /* Rechter Inhaltsbereich */
+        .inhalt {
+            flex: 1;
+            padding: 30px;
+        }
+
+            /* Überschrift des aktuellen Schritts */
+            .inhalt h2 {
+                margin-top: 0;
+                color: #2c3e50;
+            }
+
+        /* Beschriftung über Eingabefeld */
+        label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        /* Alle Eingabefelder gleich */
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-family: Arial;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        /* Zwei Felder nebeneinander */
+        .zeile {
+            display: flex;
+            gap: 15px;
+        }
+
+            .zeile > div {
+                flex: 1;
+            }
+
+        /* Radio-Button Gruppe für Priorität */
+        .radio-gruppe {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+            /* Priorität Farben */
+            .radio-option.low {
+                border-color: #28a745;
+            }
+
+            .radio-option.medium {
+                border-color: #ffc107;
+            }
+
+            .radio-option.high {
+                border-color: #dc3545;
+            }
+
+            .radio-option input[type="radio"] {
+                width: auto;
+                cursor: pointer;
+            }
+
+        /* Tabs für Schritt 3 */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 8px 20px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            cursor: pointer;
+            background: white;
+            font-size: 14px;
+        }
+
+            /* Aktiver Tab */
+            .tab.aktiv {
+                background: #2c3e50;
+                color: white;
+                border-color: #2c3e50;
+            }
+
+        /* Textbereich für Tabs */
+        .tab-inhalt {
+            display: none;
+        }
+
+            .tab-inhalt.aktiv {
+                display: block;
+            }
+
+        textarea {
+            height: 150px;
+            resize: vertical;
+        }
+
+        /* Zusätzliche Kontakte */
+        .kontakt-liste {
+            margin-top: 10px;
+        }
+
+        .kontakt-eintrag {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+            .kontakt-eintrag input {
+                flex: 1;
+            }
+
+        /* Plus Button für Kontakt hinzufügen */
+        .btn-plus {
+            padding: 8px 15px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        /* Löschen Button für Kontakt */
+        .btn-loeschen {
+            padding: 8px 12px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        /* Anhang Bereich – sieht aus als ob es funktioniert */
+        .anhang-bereich {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            align-items: center;
+        }
+
+            .anhang-bereich input {
+                flex: 1;
+            }
+
+        .btn-browse {
+            padding: 10px 15px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .btn-upload {
+            padding: 10px 15px;
+            background: #17a2b8;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        /* Referenz Bereich */
+        .referenz-zeile {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        /* Checkbox Bereich für Schritt 5 */
+        .checkbox-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 15px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            margin-top: 15px;
+            cursor: pointer;
+        }
+
+            .checkbox-option input[type="checkbox"] {
+                width: auto;
+                margin-top: 3px;
+                cursor: pointer;
+            }
+
+        /* Buttons unten */
+        .buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+
+        .btn-abbrechen {
+            padding: 12px 30px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        .btn-weiter {
+            padding: 12px 30px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+            .btn-weiter:hover {
+                background: #218838;
+            }
+
+        .btn-abbrechen:hover {
+            background: #5a6268;
+        }
+
+        /* Fehlermeldung */
+        #feedback {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Linke Sidebar Navigation -->
+    <div class="sidebar">
+        <h2>Ticket System</h2>
+        <a href="/startseite.html">Meine Tickets</a>
+        <a href="/ticket-erstellen.html">Ticket erstellen</a>
+        <a href="/problemMelden.html">Problem melden</a>
+        <a href="#" class="abmelden" onclick="abmelden()">Ausloggen</a>
+    </div>
+
+    <!-- Hauptbereich -->
+    <div class="main">
+
+        <!-- Benutzername oben rechts -->
+        <span class="benutzer" id="benutzername">...</span>
+
+        <h1>Neues Ticket erstellen</h1>
+
+        <!-- Weiße Karte mit Schritten -->
+        <div class="karte">
+
+            <!-- Linke Schritte-Leiste -->
+            <div class="schritte">
+                <div class="schritt aktiv" id="nav-1" onclick="schrittwechseln(1)">1. Kontakt</div>
+                <div class="schritt" id="nav-2" onclick="schrittwechseln(2)">2. Klassifizierung</div>
+                <div class="schritt" id="nav-3" onclick="schrittwechseln(3)">3. Beschreibung</div>
+                <div class="schritt" id="nav-4" onclick="schrittwechseln(4)">4. Referenz</div>
+                <div class="schritt" id="nav-5" onclick="schrittwechseln(5)">5. Informationen</div>
+            </div>
+
+            <!-- Rechter Inhaltsbereich – hier wird der aktuelle Schritt angezeigt -->
+            <div class="inhalt">
+
+                <!-- ===== SCHRITT 1: KONTAKT ===== -->
+                <div id="schritt-1">
+                    <h2>Kontakt</h2>
+
+                    <!-- Vorname und Nachname nebeneinander -->
+                    <div class="zeile">
+                        <div>
+                            <label>Vorname</label>
+                            <input type="text" id="vorname" placeholder="Vorname">
+                        </div>
+                        <div>
+                            <label>Nachname</label>
+                            <input type="text" id="nachname" placeholder="Nachname">
+                        </div>
+                    </div>
+
+                    <label>E-Mail Adresse</label>
+                    <input type="email" id="email" placeholder="email@firma.com">
+
+                    <!-- Zusätzliche Kontakte -->
+                    <label>Zusätzliche Kontakte</label>
+                    <p style="color:gray; font-size:13px; margin:0">
+                        Weitere Kollegen die benachrichtigt werden sollen:
+                    </p>
+
+                    <!-- Container für zusätzliche Kontakte -->
+                    <div class="kontakt-liste" id="kontaktListe">
+                        <!-- Erster Kontakt -->
+                        <div class="kontakt-eintrag">
+                            <input type="email" placeholder="kollege@firma.com">
+                            <!-- Plus Button fügt neues Feld hinzu -->
+                            <button class="btn-plus" onclick="kontaktHinzufuegen()">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== SCHRITT 2: KLASSIFIZIERUNG ===== -->
+                <!-- display:none bedeutet versteckt – wird sichtbar wenn User auf Weiter klickt -->
+                <div id="schritt-2" style="display:none">
+                    <h2>Klassifizierung</h2>
+
+                    <!-- Priorität als Radio-Buttons -->
+                    <label>Priorität</label>
+                    <div class="radio-gruppe">
+                        <label class="radio-option low">
+                            <input type="radio" name="prioritaet" value="0">
+                            <div>
+                                <strong>Low</strong>
+                                <p style="margin:0; color:gray; font-size:13px">
+                                    Kann warten – keine dringende Auswirkung
+                                </p>
+                            </div>
+                        </label>
+                        <label class="radio-option medium">
+                            <input type="radio" name="prioritaet" value="1">
+                            <div>
+                                <strong>Medium</strong>
+                                <p style="margin:0; color:gray; font-size:13px">
+                                    Bald lösen – beeinträchtigt die Arbeit
+                                </p>
+                            </div>
+                        </label>
+                        <label class="radio-option high">
+                            <input type="radio" name="prioritaet" value="2">
+                            <div>
+                                <strong>High</strong>
+                                <p style="margin:0; color:gray; font-size:13px">
+                                    Dringend – blockiert die Arbeit komplett
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Abteilung als freies Eingabefeld -->
+                    <label>Abteilung</label>
+                    <input type="text" id="abteilung" placeholder="z.B. Buchhaltung, IT, Vertrieb">
+
+                    <!-- Komponente als freies Eingabefeld -->
+                    <label>Komponente</label>
+                    <input type="text" id="komponente"
+                           placeholder="z.B. SAP, Zeiterfassung, Internetseite">
+                </div>
+
+                <!-- ===== SCHRITT 3: BESCHREIBUNG ===== -->
+                <div id="schritt-3" style="display:none">
+                    <h2>Beschreibung</h2>
+
+                    <label>Titel</label>
+                    <input type="text" id="titel" placeholder="Kurze prägnante Beschreibung des Problems">
+
+                    <!-- 3 Tabs: Szenario, Erwartetes Ergebnis, Aktuelles Ergebnis -->
+                    <div class="tabs" style="margin-top:20px">
+                        <!-- onclick wechselt den aktiven Tab -->
+                        <button class="tab aktiv" onclick="tabWechseln('szenario')">
+                            Szenario
+                        </button>
+                        <button class="tab" onclick="tabWechseln('erwartet')">
+                            Erwartetes Ergebnis
+                        </button>
+                        <button class="tab" onclick="tabWechseln('aktuell')">
+                            Aktuelles Ergebnis
+                        </button>
+                    </div>
+
+                    <!-- Jeder Tab hat ein eigenes Textfeld -->
+                    <!-- Nur der aktive Tab ist sichtbar -->
+                    <div class="tab-inhalt aktiv" id="tab-szenario">
+                        <textarea id="szenario"
+                                  placeholder="Was hast du gemacht? Bei welchem Vorgang ist es passiert?">
+                        </textarea>
+                    </div>
+                    <div class="tab-inhalt" id="tab-erwartet">
+                        <textarea id="erwartet"
+                                  placeholder="Was hättest du erwartet dass passiert?">
+                        </textarea>
+                    </div>
+                    <div class="tab-inhalt" id="tab-aktuell">
+                        <textarea id="aktuell"
+                                  placeholder="Was ist stattdessen passiert?">
+                        </textarea>
+                    </div>
+                </div>
+
+                <!-- ===== SCHRITT 4: REFERENZ & ANHÄNGE ===== -->
+                <div id="schritt-4" style="display:none">
+                    <h2>Referenz & Anhänge</h2>
+
+                    <!-- Referenz: Ticketnummer + Kommentar -->
+                    <label>Referenz hinzufügen</label>
+                    <div class="referenz-zeile">
+                        <input type="text" id="refTicket" placeholder="Ticketnummer">
+                        <input type="text" id="refKommentar" placeholder="Kommentar">
+                    </div>
+
+                    <!-- Anhang – sieht aus als ob es funktioniert -->
+                    <label>Anhang hinzufügen</label>
+                    <div class="anhang-bereich">
+                        <input type="text" id="anhangName" placeholder="Dateiname..." readonly>
+                        <!-- Browse öffnet Dateiauswahl – aber wir speichern nichts -->
+                        <input type="file" id="anhangFile" style="display:none"
+                               onchange="dateiGewaehlt()">
+                        <button class="btn-browse" onclick="document.getElementById('anhangFile').click()">
+                            Browse
+                        </button>
+                        <button class="btn-upload" onclick="anhangHinzufuegen()">
+                            Upload
+                        </button>
+                    </div>
+
+                    <!-- Checkbox: Persönliche Daten im File -->
+                    <label class="checkbox-option" style="margin-top:15px">
+                        <input type="checkbox" id="persoenlicheDaten">
+                        <span>Persönliche Daten im File?</span>
+                    </label>
+
+                    <!-- Liste der hochgeladenen Anhänge -->
+                    <label>Hinzugefügte Anhänge</label>
+                    <div id="anhangListe" style="color:gray; font-size:13px">
+                        Noch keine Anhänge hinzugefügt.
+                    </div>
+                </div>
+
+                <!-- ===== SCHRITT 5: INFORMATIONEN ===== -->
+                <div id="schritt-5" style="display:none">
+                    <h2>Informationen</h2>
+                    <p style="color:gray">
+                        Bitte lies folgende Punkte sorgfältig durch und stimme zu:
+                    </p>
+
+                    <!-- Checkbox 1: Kosten -->
+                    <label class="checkbox-option">
+                        <input type="checkbox" id="agreeBilling">
+                        <div>
+                            <strong>Kosten bestätigen</strong>
+                            <p style="margin:0; color:gray; font-size:13px">
+                                Ich bin mir bewusst dass dieses Ticket Kosten verursachen kann.
+                            </p>
+                        </div>
+                    </label>
+
+                    <!-- Checkbox 2: AGB -->
+                    <label class="checkbox-option">
+                        <input type="checkbox" id="agreeAgb">
+                        <div>
+                            <strong>AGB zustimmen</strong>
+                            <p style="margin:0; color:gray; font-size:13px">
+                                Ich stimme den allgemeinen Geschäftsbedingungen zu.
+                            </p>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Feedback Meldung -->
+                <p id="feedback"></p>
+
+                <!-- Buttons: Abbrechen und Weiter/Absenden -->
+                <div class="buttons">
+                    <button class="btn-abbrechen" onclick="abbrechen()">Abbrechen</button>
+                    <button class="btn-weiter" id="btn-weiter" onclick="weiter()">
+                        Weiter →
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Beim Laden der Seite prüfen ob der User eingeloggt ist
+        const token = localStorage.getItem('meinToken');
+        if (!token) {
+            window.location.href = '/index.html';
+        }
+
+        // Benutzername laden
+        async function benutzerLaden() {
+            try {
+                const response = await fetch('/api/user/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const ich = await response.json();
+                document.getElementById('benutzername').innerText = `👤 ${ich.email}`;
+            } catch (e) {
+                console.error('Fehler beim Laden des Benutzers', e);
+            }
+        }
+        benutzerLaden();
+
+        // Aktueller Schritt – startet bei 1
+        let aktuellerSchritt = 1;
+
+        // Gespeicherte Anhänge Liste
+        let anhaenge = [];
+
+        // Wird aufgerufen wenn User auf "Weiter" klickt
+        function weiter() {
+            const feedback = document.getElementById('feedback');
+            feedback.innerHTML = '';
+
+            // Pflichtfelder des aktuellen Schritts prüfen
+            if (aktuellerSchritt === 1) {
+                const vorname = document.getElementById('vorname').value;
+                const nachname = document.getElementById('nachname').value;
+                const email = document.getElementById('email').value;
+
+                // Prüfen ob alle Pflichtfelder ausgefüllt sind
+                if (!vorname || !nachname || !email) {
+                    feedback.innerHTML =
+                        `<span style="color:red">❌ Bitte alle Pflichtfelder ausfüllen!</span>`;
+                    return;
+                }
+            }
+
+            if (aktuellerSchritt === 2) {
+                // Prüfen ob eine Priorität ausgewählt wurde
+                const prioritaet = document.querySelector('input[name="prioritaet"]:checked');
+                if (!prioritaet) {
+                    feedback.innerHTML =
+                        `<span style="color:red">❌ Bitte eine Priorität auswählen!</span>`;
+                    return;
+                }
+            }
+
+            if (aktuellerSchritt === 3) {
+                const titel = document.getElementById('titel').value;
+                if (!titel) {
+                    feedback.innerHTML =
+                        `<span style="color:red">❌ Bitte einen Titel eingeben!</span>`;
+                    return;
+                }
+            }
+
+            if (aktuellerSchritt === 5) {
+                // Letzter Schritt – Ticket absenden
+                senden();
+                return;
+            }
+
+            // Nächsten Schritt anzeigen
+            schrittwechseln(aktuellerSchritt + 1);
+        }
+
+        // Wechselt zum angegebenen Schritt
+        function schrittwechseln(neuerSchritt) {
+            // Aktuellen Schritt verstecken
+            document.getElementById(`schritt-${aktuellerSchritt}`).style.display = 'none';
+
+            // Aktuellen Schritt in der linken Leiste als erledigt markieren
+            document.getElementById(`nav-${aktuellerSchritt}`).className = 'schritt';
+
+            // Neuen Schritt anzeigen
+            aktuellerSchritt = neuerSchritt;
+            document.getElementById(`schritt-${aktuellerSchritt}`).style.display = 'block';
+
+            // Neuen Schritt in der linken Leiste als aktiv markieren
+            document.getElementById(`nav-${aktuellerSchritt}`).className = 'schritt aktiv';
+
+            // Button Text ändern wenn letzter Schritt
+            if (aktuellerSchritt === 5) {
+                document.getElementById('btn-weiter').innerText = '✅ Absenden';
+            } else {
+                document.getElementById('btn-weiter').innerText = 'Weiter →';
+            }
+
+            // Feedback leeren
+            document.getElementById('feedback').innerHTML = '';
+        }
+
+        // Tab wechseln in Schritt 3
+        function tabWechseln(tabName) {
+            // Alle Tabs deaktivieren
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('aktiv'));
+            document.querySelectorAll('.tab-inhalt').forEach(t => t.classList.remove('aktiv'));
+
+            // Gewählten Tab aktivieren
+            document.getElementById(`tab-${tabName}`).classList.add('aktiv');
+
+            // Richtigen Button aktivieren
+            event.target.classList.add('aktiv');
+        }
+
+        // Neues Kontakt-Feld hinzufügen
+        function kontaktHinzufuegen() {
+            const liste = document.getElementById('kontaktListe');
+
+            // Neues Eingabefeld erstellen
+            const neuerEintrag = document.createElement('div');
+            neuerEintrag.className = 'kontakt-eintrag';
+            neuerEintrag.innerHTML = `
+                <input type="email" placeholder="kollege@firma.com">
+                <button class="btn-loeschen" onclick="this.parentElement.remove()">✕</button>
+            `;
+            liste.appendChild(neuerEintrag);
+        }
+
+        // Datei wurde ausgewählt - zeigt den Dateinamen an
+        function dateiGewaehlt() {
+            const file = document.getElementById('anhangFile').files[0];
+            if (file) {
+                document.getElementById('anhangName').value = file.name;
+            }
+        }
+
+        // Anhang zur Liste hinzufügen (nur Anzeige – keine echte Speicherung)
+        function anhangHinzufuegen() {
+            const name = document.getElementById('anhangName').value;
+            if (!name) return;
+
+            const persoenlich = document.getElementById('persoenlicheDaten').checked;
+
+            // Zur Liste hinzufügen
+            anhaenge.push({ name, persoenlich });
+
+            // Liste aktualisieren
+            const liste = document.getElementById('anhangListe');
+            liste.innerHTML = anhaenge.map((a, i) => `
+                <div style="display:flex; gap:10px; align-items:center;
+                            padding:8px; background:#f5f5f5; border-radius:8px; margin-top:5px">
+                    <span style="flex:1">${a.name}</span>
+                    <span style="color:${a.persoenlich ? 'red' : 'gray'}; font-size:12px">
+                        ${a.persoenlich ? 'Persönlich' : ''}
+                    </span>
+                    <button class="btn-loeschen" onclick="anhangLoeschen(${i})">✕</button>
+                </div>
+            `).join('');
+
+            // Felder leeren
+            document.getElementById('anhangName').value = '';
+            document.getElementById('anhangFile').value = '';
+            document.getElementById('persoenlicheDaten').checked = false;
+        }
+
+        // Anhang aus der Liste entfernen
+        function anhangLoeschen(index) {
+            anhaenge.splice(index, 1);
+            anhangHinzufuegen(); // Liste neu rendern
+        }
+
+        // Ticket ans Backend schicken
+        async function senden() {
+            const feedback = document.getElementById('feedback');
+
+            // AGBs prüfen
+            if (!document.getElementById('agreeBilling').checked) {
+                feedback.innerHTML =
+                    `<span style="color:red">Bitte bestätige dass das Ticket Kosten verursachen kann!</span>`;
+                return;
+            }
+            if (!document.getElementById('agreeAgb').checked) {
+                feedback.innerHTML =
+                    `<span style="color:red">Bitte stimme den AGB zu!</span>`;
+                return;
+            }
+
+            // Alle Daten sammeln
+            const prioritaet = document.querySelector('input[name="prioritaet"]:checked').value;
+            const titel = document.getElementById('titel').value;
+            const szenario = document.getElementById('szenario').value;
+            const erwartet = document.getElementById('erwartet').value;
+            const aktuell = document.getElementById('aktuell').value;
+            const abteilung = document.getElementById('abteilung').value;
+            const komponente = document.getElementById('komponente').value;
+
+            // Beschreibung aus den 3 Tabs zusammenbauen
+            const beschreibung =
+                `Szenario:\n${szenario}\n\nErwartetes Ergebnis:\n${erwartet}\n\nAktuelles Ergebnis:\n${aktuell}`;
+
+            try {
+                // Ticket ans Backend schicken
+                const response = await fetch('/api/ticket', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        title: titel,
+                        description: beschreibung,
+                        priority: parseInt(prioritaet),
+                        category: 0  // Normal = 0
+                    })
+                });
+
+                if (response.ok) {
+                    // Erfolgsmeldung und zurück zur Startseite
+                    feedback.innerHTML =
+                        `<span style="color:green">Ticket wurde erfolgreich erstellt!</span>`;
+                    setTimeout(() => {
+                        window.location.href = '/startseite.html';
+                    }, 2000); // Nach 2 Sekunden weiterleiten
+                } else {
+                    feedback.innerHTML = `<span style="color:red">Fehler beim Erstellen!</span>`;
+                }
+            } catch (e) {
+                feedback.innerHTML = `<span style="color:red">Server nicht erreichbar!</span>`;
+            }
+        }
+
+        // Abbrechen – zurück zur Startseite
+        function abbrechen() {
+            window.location.href = '/startseite.html';
+        }
+
+        // Abmelden
+        function abmelden() {
+            localStorage.removeItem('meinToken');
+            window.location.href = '/index.html';
+        }
+    </script>
+
+</body>
+</html>
