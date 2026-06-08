@@ -2,13 +2,16 @@
 
 namespace TicketApplication.Models
 {
-    public class TicketTransactions
+    public class TicketTransaction
     {
         // Hier werden alle Änderungen dokumentiert
         // Dialog-Texte werden in TicketDialogue gespeichert
-        public int Id { get; set; } // Primärschlüssel aus Ticket
+        public int TicketId { get; set; } // Primärschlüssel aus Ticket
         public int TransactionId { get; set; } // Primärschlüssel
+        public int ResponsibleUserId { get; set; } // Wer hat die Änderung vorgenommen?
 
+        // Nur durch den Support/Admin änderbar
+        public int? AssignedToId { get; set; }
         // Veränderlicher Ticketinhalt (aus Ticket)
         public TicketStatus Status { get; set; }
         public int? AdditionalUserId1 { get; set; }

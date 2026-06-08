@@ -5,7 +5,7 @@ using TicketApplication.Models;
 
 namespace TicketApplication.DTOs
 {
-    public class UpdateTicketStatusDTO
+    public class UpdateTicketStatusDto  
     {
         [Required]
         [ExistsInColumn(typeof(Ticket), "Id", ErrorMessage = "Ticket nicht gefunden.")]

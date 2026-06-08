@@ -16,7 +16,7 @@ namespace TicketApplication.Data
         public DbSet<User> Users { get; set; }
         public DbSet<Ticket> Tickets { get; set; }
         public DbSet<TicketDialogue> TicketDialogue { get; set; }
-        public DbSet<TicketTransactions> TicketTransactions { get; set; }
+        public DbSet<TicketTransaction> TicketTransactions { get; set; }
         public DbSet<Department> Departments { get; set; }
         public DbSet<Subject> Subjects { get; set; }
 
@@ -26,7 +26,7 @@ namespace TicketApplication.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            modelBuilder.Entity<TicketTransactions>(entity =>
+            modelBuilder.Entity<TicketTransaction>(entity =>
             {
                 entity.HasKey(t => new { t.Id, t.TransactionId });
 
