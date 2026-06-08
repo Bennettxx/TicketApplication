@@ -36,6 +36,22 @@ namespace TicketApplication.Data
                 context.Users.Add(adminUser);
                 context.SaveChanges();
             }
+            // Default Daten für Departments
+            if (!context.Departments.Any())
+            {
+                // Erstelle 3 Standard-Departments
+                for (int i = 0; i < 3; i++)
+                {
+                    string[] departmentNames = { "IT Support", "Einkauf", "Verkauf" };
+                    var department = new Department
+                    {
+                        Id = i,
+                        Name = departmentNames[i],
+                    };
+                    context.Departments.Add(department);
+                    context.SaveChanges();
+                }
+            }
         }
     }
 }

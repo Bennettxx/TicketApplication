@@ -12,9 +12,13 @@ namespace TicketApplication.Controllers
     // Dieser Controller ist für die Verwaltung der User zuständig
     // Er bietet Endpunkte für CRUD-Operationen (Create, Read, Update, Delete) auf User-Objekten
     // Alle Endpunkte in diesem Controller haben die Basis-URL "api/user"
+
+
+    // Mal gucken was wir mit den Controller machen ... er ist irgendwie zwecklos
     
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class UserController : ControllerBase
     {
         private readonly ApplicationDbContext _context;

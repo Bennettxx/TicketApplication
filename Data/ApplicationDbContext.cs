@@ -15,7 +15,34 @@ namespace TicketApplication.Data
 
         public DbSet<User> Users { get; set; }
         public DbSet<Ticket> Tickets { get; set; }
+        public DbSet<TicketDialogue> TicketDialogue { get; set; }
+        public DbSet<TicketTransaction> TicketTransactions { get; set; }
+        public DbSet<Department> Departments { get; set; }
+        public DbSet<Subject> Subjects { get; set; }
 
+
+        // PKs festlegen - sofern es nicht "nur" die ID ist (wird autom. erkannt)
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<TicketTransaction>(entity =>
+            {
+                entity.HasKey(t => new { t.Id, t.TransactionId });
+
+                entity.HasOne<Ticket>()
+                      .WithMany()
+                      .HasForeignKey(t => t.Id);
+            });
+            modelBuilder.Entity<TicketDialogue>(entity =>
+            {
+                entity.HasKey(t => new { t.Id, t.TicketDialogueId });
+
+                entity.HasOne<Ticket>()
+                      .WithMany()
+                      .HasForeignKey(t => t.Id);
+            });
+        }
 
     }
 }
