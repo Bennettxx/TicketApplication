@@ -24,7 +24,6 @@ namespace TicketApplication.Data
                 // Logik für: "Wenn keine User da sind, erstelle einen Admin"
                 var adminUser = new User
                 {
-                    Id = 0,
                     FirstName = "Admin",
                     SecondName = "User",
                     Email = "admin@user.com",
@@ -39,18 +38,13 @@ namespace TicketApplication.Data
             // Default Daten für Departments
             if (!context.Departments.Any())
             {
-                // Erstelle 3 Standard-Departments
-                for (int i = 0; i < 3; i++)
+                string[] departmentNames = { "IT Support", "Einkauf", "Verkauf" };
+
+                foreach (var name in departmentNames)
                 {
-                    string[] departmentNames = { "IT Support", "Einkauf", "Verkauf" };
-                    var department = new Department
-                    {
-                        Id = i,
-                        Name = departmentNames[i],
-                    };
-                    context.Departments.Add(department);
-                    context.SaveChanges();
+                    context.Departments.Add(new Department { Name = name });
                 }
+                context.SaveChanges();
             }
         }
     }

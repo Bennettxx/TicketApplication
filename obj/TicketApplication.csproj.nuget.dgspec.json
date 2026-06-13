@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\bennett.piel\\source\\repos\\Bennettxx\\TicketApplication\\TicketApplication.csproj": {}
+    "C:\\Users\\Ben\\source\\repos\\Bennettxx\\TicketApplication\\TicketApplication.csproj": {}
   },
   "projects": {
-    "C:\\Users\\bennett.piel\\source\\repos\\Bennettxx\\TicketApplication\\TicketApplication.csproj": {
+    "C:\\Users\\Ben\\source\\repos\\Bennettxx\\TicketApplication\\TicketApplication.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\bennett.piel\\source\\repos\\Bennettxx\\TicketApplication\\TicketApplication.csproj",
+        "projectUniqueName": "C:\\Users\\Ben\\source\\repos\\Bennettxx\\TicketApplication\\TicketApplication.csproj",
         "projectName": "TicketApplication",
-        "projectPath": "C:\\Users\\bennett.piel\\source\\repos\\Bennettxx\\TicketApplication\\TicketApplication.csproj",
-        "packagesPath": "C:\\Users\\bennett.piel\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\bennett.piel\\source\\repos\\Bennettxx\\TicketApplication\\obj\\",
+        "projectPath": "C:\\Users\\Ben\\source\\repos\\Bennettxx\\TicketApplication\\TicketApplication.csproj",
+        "packagesPath": "C:\\Users\\Ben\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\Ben\\source\\repos\\Bennettxx\\TicketApplication\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\bennett.piel\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\Ben\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -117,7 +117,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",

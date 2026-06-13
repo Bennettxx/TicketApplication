@@ -28,11 +28,11 @@ namespace TicketApplication.Data
 
             modelBuilder.Entity<TicketTransaction>(entity =>
             {
-                entity.HasKey(t => new { t.Id, t.TransactionId });
+                entity.HasKey(t => new { t.TicketId, t.TransactionId });
 
                 entity.HasOne<Ticket>()
                       .WithMany()
-                      .HasForeignKey(t => t.Id);
+                      .HasForeignKey(t => t.TicketId);
             });
             modelBuilder.Entity<TicketDialogue>(entity =>
             {
