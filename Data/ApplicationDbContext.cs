@@ -1,5 +1,5 @@
-﻿using TicketApplication.Models;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using TicketApplication.Models;
 
 namespace TicketApplication.Data
 {
