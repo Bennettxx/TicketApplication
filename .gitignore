@@ -14,6 +14,9 @@
 # Vorlage steht in appsettings.Local.json.example
 appsettings.Local.json
 
+# Hochgeladene (öffentliche) Datei-Anhänge — lokaler Speicher, nicht ins Repo
+AttachmentStorage/
+
 # Persönliche Lern-Doku — nur für mich lokal, nicht für GitHub
 README_CLAUDE.md
 

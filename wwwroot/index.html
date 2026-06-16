@@ -46,6 +46,9 @@
 
         <button onclick="anmelden()">Einloggen</button>
         <p id="feedback"></p>
+        <p style="text-align:center; font-size:13px; margin-top:14px;">
+            Noch kein Konto? <a href="/register.html">Jetzt registrieren</a>
+        </p>
     </div>
 
     <script>
@@ -71,7 +74,7 @@
                 feedback.innerHTML = `<span style="color:red">Login falsch!</span>`;
             }
         } catch (e) {
-            feedback.innerHTML = `<span style="color:red">Erfolgreicher Login!</span>`;
+            feedback.innerHTML = `<span style="color:red">Server nicht erreichbar!</span>`;
         }
     }
     </script>

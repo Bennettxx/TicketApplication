@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Mein Profil</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .karte { max-width: 520px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+
+    <div class="main">
+        <span class="benutzer" id="benutzername">...</span>
+        <h1>Mein Profil</h1>
+
+        <div class="karte">
+            <h3 style="margin-top:0">Stammdaten</h3>
+            <label>Vorname</label>
+            <input type="text" id="vorname">
+            <label>Nachname</label>
+            <input type="text" id="nachname">
+            <label>E-Mail</label>
+            <input type="email" id="email">
+            <button class="btn-gruen" style="margin-top:14px;" onclick="profilSpeichern()">Speichern</button>
+            <span id="profilFeedback" class="mini"></span>
+        </div>
+
+        <div class="karte">
+            <h3 style="margin-top:0">Passwort ändern</h3>
+            <label>Aktuelles Passwort</label>
+            <input type="password" id="altPw">
+            <label>Neues Passwort</label>
+            <input type="password" id="neuPw">
+            <label>Neues Passwort wiederholen</label>
+            <input type="password" id="neuPw2">
+            <p class="mini">Min. 8 Zeichen, Groß-/Kleinbuchstabe und Ziffer.</p>
+            <button class="btn-gruen" onclick="passwortAendern()">Passwort ändern</button>
+            <span id="pwFeedback" class="mini"></span>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+    <script>
+        (async function () {
+            await seitenleisteAufbauen('profil');
+            const mich = await getMich();
+            document.getElementById('vorname').value = mich.firstName || '';
+            document.getElementById('nachname').value = mich.secondName || '';
+            document.getElementById('email').value = mich.email || '';
+        })();
+
+        async function profilSpeichern() {
+            const fb = document.getElementById('profilFeedback');
+            const body = {
+                firstName: document.getElementById('vorname').value.trim(),
+                secondName: document.getElementById('nachname').value.trim(),
+                email: document.getElementById('email').value.trim()
+            };
+            if (!body.firstName || !body.secondName || !body.email) {
+                fb.textContent = 'Bitte alle Felder ausfüllen.'; return;
+            }
+            try {
+                await api('/api/account/me', { method: 'PUT', body: JSON.stringify(body) });
+                fb.textContent = 'Profil gespeichert.';
+                // Cache zurücksetzen, damit Name oben rechts aktualisiert
+                MICH = null;
+                await seitenleisteAufbauen('profil');
+            } catch (e) { fb.textContent = e.message; }
+        }
+
+        async function passwortAendern() {
+            const fb = document.getElementById('pwFeedback');
+            const alt = document.getElementById('altPw').value;
+            const neu = document.getElementById('neuPw').value;
+            const neu2 = document.getElementById('neuPw2').value;
+            if (!alt || !neu) { fb.textContent = 'Bitte alle Felder ausfüllen.'; return; }
+            if (neu !== neu2) { fb.textContent = 'Neue Passwörter stimmen nicht überein.'; return; }
+            try {
+                await api('/api/account/me/password', {
+                    method: 'PUT',
+                    body: JSON.stringify({ oldPassword: alt, newPassword: neu })
+                });
+                fb.textContent = 'Passwort geändert.';
+                document.getElementById('altPw').value = '';
+                document.getElementById('neuPw').value = '';
+                document.getElementById('neuPw2').value = '';
+            } catch (e) { fb.textContent = e.message; }
+        }
+    </script>
+</body>
+</html>

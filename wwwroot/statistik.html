@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Statistik</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .balken-zelle { min-width: 160px; }
+        .balken {
+            height: 10px; border-radius: 5px; background: #1abc9c; display: inline-block;
+            vertical-align: middle; margin-right: 8px;
+        }
+        h2 { color: #2c3e50; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+
+    <div class="main">
+        <span class="benutzer" id="benutzername">...</span>
+        <h1>Statistik</h1>
+        <p id="feedback" class="mini"></p>
+
+        <h2>Abteilungen</h2>
+        <p style="color:#555">Bearbeitungszeit kategorisiert nach Abteilung des Erstellers (Kunden).</p>
+        <div id="abteilungBereich" class="karte">Lädt...</div>
+
+        <h2>Bearbeiter</h2>
+        <p style="color:#555">Wer hat wie viele Tickets bearbeitet und wie viel Zeit erfasst?</p>
+        <div id="agentBereich" class="karte">Lädt...</div>
+
+        <h2>Kunden</h2>
+        <p style="color:#555">Welcher Kunde hat wie viel Bearbeitungszeit verursacht?</p>
+        <div id="kundeBereich" class="karte">Lädt...</div>
+    </div>
+
+    <script src="/app.js"></script>
+    <script>
+        (async function () {
+            await seitenleisteAufbauen('statistik');
+            const mich = await getMich();
+            if (mich.role !== 'Admin') {
+                document.querySelector('.main').innerHTML =
+                    '<p class="feedback-rot">Kein Zugriff. Nur Admins.</p>';
+                return;
+            }
+            await abteilungenLaden();
+            await agentsLaden();
+            await kundenLaden();
+        })();
+
+        // Hilfsfunktion: maximale Minuten für Balken-Skalierung.
+        function maxMin(arr) { return Math.max(1, ...arr.map(x => x.totalMinutes)); }
+
+        async function abteilungenLaden() {
+            try {
+                const abt = await api('/api/statistics/departments');
+                const max = maxMin(abt);
+                if (!abt.length) { document.getElementById('abteilungBereich').innerHTML = '<p>Keine Abteilungen.</p>'; return; }
+                document.getElementById('abteilungBereich').innerHTML = `
+                    <table>
+                        <thead><tr>
+                            <th>Abteilung</th><th>Benutzer</th><th>Tickets</th><th>davon offen</th><th>Bearbeitungszeit</th>
+                        </tr></thead>
+                        <tbody>${abt.map(a => `
+                            <tr>
+                                <td><b>${esc(a.departmentName)}</b></td>
+                                <td>${a.userCount}</td>
+                                <td>${a.ticketCount}</td>
+                                <td>${a.openTicketCount}</td>
+                                <td class="balken-zelle">
+                                    <span class="balken" style="width:${Math.round(a.totalMinutes / max * 120)}px"></span>
+                                    ${minutenFormat(a.totalMinutes)}
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+            } catch (e) {
+                document.getElementById('abteilungBereich').innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+
+        async function agentsLaden() {
+            try {
+                const agents = await api('/api/statistics/agents');
+                const max = maxMin(agents);
+                if (!agents.length) { document.getElementById('agentBereich').innerHTML = '<p>Keine Bearbeiter.</p>'; return; }
+                document.getElementById('agentBereich').innerHTML = `
+                    <table>
+                        <thead><tr>
+                            <th>Bearbeiter</th><th>Rolle</th><th>Zugewiesen</th><th>Geschlossen</th><th>Erfasste Zeit</th>
+                        </tr></thead>
+                        <tbody>${agents.map(a => `
+                            <tr>
+                                <td><b>${esc(a.name || a.email)}</b><br><span class="mini">${esc(a.email)}</span></td>
+                                <td>${esc(a.role)}</td>
+                                <td>${a.assignedTicketCount}</td>
+                                <td>${a.closedTicketCount}</td>
+                                <td class="balken-zelle">
+                                    <span class="balken" style="width:${Math.round(a.totalMinutes / max * 120)}px"></span>
+                                    ${minutenFormat(a.totalMinutes)}
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+            } catch (e) {
+                document.getElementById('agentBereich').innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+
+        async function kundenLaden() {
+            try {
+                const kunden = await api('/api/statistics/customers');
+                const max = maxMin(kunden);
+                if (!kunden.length) { document.getElementById('kundeBereich').innerHTML = '<p>Keine Kunden.</p>'; return; }
+                document.getElementById('kundeBereich').innerHTML = `
+                    <table>
+                        <thead><tr>
+                            <th>Kunde</th><th>Abteilung</th><th>Tickets</th><th>davon offen</th><th>Bearbeitungszeit</th>
+                        </tr></thead>
+                        <tbody>${kunden.map(k => `
+                            <tr>
+                                <td><b>${esc(k.name || k.email)}</b><br><span class="mini">${esc(k.email)}</span></td>
+                                <td>${esc(k.departmentName)}</td>
+                                <td>${k.ticketCount}</td>
+                                <td>${k.openTicketCount}</td>
+                                <td class="balken-zelle">
+                                    <span class="balken" style="width:${Math.round(k.totalMinutes / max * 120)}px"></span>
+                                    ${minutenFormat(k.totalMinutes)}
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+            } catch (e) {
+                document.getElementById('kundeBereich').innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

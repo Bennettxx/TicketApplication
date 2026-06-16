@@ -44,6 +44,9 @@ builder.Configuration.AddJsonFile(
 // speichern. So bekommt jede Installation ihren eigenen einzigartigen Key.
 EnsureJwtKeyExists(builder);
 
+// Schlüssel für die Anhang-Verschlüsselung sicherstellen (analog zum JWT-Key).
+EnsureAttachmentKeyExists(builder);
+
 // Connection-String prüfen — sonst kommt später eine sehr kryptische
 // Fehlermeldung aus dem EF-Core-Innern.
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -210,4 +213,46 @@ static void EnsureJwtKeyExists(WebApplicationBuilder builder)
     Console.WriteLine(" 'appsettings.Local.json' gespeichert.");
     Console.WriteLine(" Diese Datei NICHT ins Git-Repo committen!");
     Console.WriteLine("================================================================");
+}
+
+// Stellt sicher, dass ein 32-Byte-Schlüssel (Base64) für die AES-GCM-
+// Verschlüsselung privater Anhänge existiert. Wird wie der JWT-Key beim ersten
+// Start erzeugt und in appsettings.Local.json gespeichert.
+static void EnsureAttachmentKeyExists(WebApplicationBuilder builder)
+{
+    var existingKey = builder.Configuration["Attachments:Key"];
+    if (!string.IsNullOrWhiteSpace(existingKey))
+        return;
+
+    var randomBytes = new byte[32]; // 256 Bit
+    RandomNumberGenerator.Fill(randomBytes);
+    var newKey = Convert.ToBase64String(randomBytes);
+
+    var localJsonPath = Path.Combine(builder.Environment.ContentRootPath, "appsettings.Local.json");
+    JsonObject root;
+    if (File.Exists(localJsonPath))
+    {
+        var content = File.ReadAllText(localJsonPath);
+        root = string.IsNullOrWhiteSpace(content)
+            ? new JsonObject()
+            : JsonNode.Parse(content)!.AsObject();
+    }
+    else
+    {
+        root = new JsonObject();
+    }
+
+    if (root["Attachments"] is not JsonObject section)
+    {
+        section = new JsonObject();
+        root["Attachments"] = section;
+    }
+    section["Key"] = newKey;
+
+    var writeOptions = new JsonSerializerOptions { WriteIndented = true };
+    File.WriteAllText(localJsonPath, root.ToJsonString(writeOptions));
+
+    ((IConfigurationRoot)builder.Configuration).Reload();
+
+    Console.WriteLine(" Anhang-Verschlüsselungsschlüssel generiert und in 'appsettings.Local.json' gespeichert.");
 }

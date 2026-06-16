@@ -49,10 +49,12 @@ namespace TicketApplication.DTOs
 
         [Required(ErrorMessage = "Abteilungsname ist erforderlich.")]
         [ExistsInColumn(typeof(Department), "Name", ErrorMessage = "Abteilung nicht gefunden.")]
-        public string DepartmentName { get; set; }
+        public string DepartmentName { get; set; } = string.Empty;
 
-        [MaxLength(30, ErrorMessage = "Abteilung nicht gefunden.")]
-        public string SubjectName { get; set; }
+        [Required(ErrorMessage = "Thema (Subject) ist erforderlich.")]
+        [MinLength(2, ErrorMessage = "Thema muss mindestens 2 Zeichen lang sein.")]
+        [MaxLength(30, ErrorMessage = "Thema darf maximal 30 Zeichen lang sein.")]
+        public string SubjectName { get; set; } = string.Empty;
 
     }
 }

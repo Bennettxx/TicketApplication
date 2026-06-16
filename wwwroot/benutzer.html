@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Benutzerverwaltung</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        h2 { color: #2c3e50; margin-top: 30px; }
+        td select { width: auto; padding: 6px; }
+        .akt-aus { color: #dc3545; font-weight: bold; }
+        .akt-an { color: #28a745; font-weight: bold; }
+        .btn-mini { padding: 5px 10px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+
+    <div class="main">
+        <span class="benutzer" id="benutzername">...</span>
+        <h1>Benutzerverwaltung</h1>
+        <p id="feedback" class="mini"></p>
+
+        <h2>Offene Registrierungen</h2>
+        <p style="color:#555">Neue Konten, die noch freigeschaltet werden müssen.</p>
+        <div id="pendingBereich" class="karte">Lädt...</div>
+
+        <h2>Alle Benutzer</h2>
+        <p style="color:#555">Rolle ändern oder Konto sperren/entsperren. Änderungen pro Zeile mit „Speichern" bestätigen.</p>
+        <div id="userBereich" class="karte">Lädt...</div>
+    </div>
+
+    <script src="/app.js"></script>
+    <script>
+        (async function () {
+            await seitenleisteAufbauen('benutzer');
+            const mich = await getMich();
+            if (mich.role !== 'Admin') {
+                document.querySelector('.main').innerHTML =
+                    '<p class="feedback-rot">Kein Zugriff. Nur Admins.</p>';
+                return;
+            }
+            await abteilungenLaden();
+            await pendingLaden();
+            await userLaden();
+        })();
+
+        // Abteilungen für die Auswahl je Benutzer.
+        let ABTEILUNGEN = [];
+        async function abteilungenLaden() {
+            try { ABTEILUNGEN = await api('/api/metadata/departments'); }
+            catch { ABTEILUNGEN = []; }
+        }
+        function abteilungOptions(selectedName) {
+            const leer = `<option value="" ${!selectedName ? 'selected' : ''}>—</option>`;
+            return leer + ABTEILUNGEN.map(a =>
+                `<option value="${esc(a.name)}" ${a.name === selectedName ? 'selected' : ''}>${esc(a.name)}</option>`
+            ).join('');
+        }
+
+        function setFeedback(text, ok) {
+            const fb = document.getElementById('feedback');
+            fb.textContent = text;
+            fb.className = ok ? 'feedback-gruen' : 'feedback-rot';
+        }
+
+        // ---- Offene Registrierungen ----
+        async function pendingLaden() {
+            const bereich = document.getElementById('pendingBereich');
+            try {
+                const pending = await api('/api/user/pending');
+                if (!pending.length) {
+                    bereich.innerHTML = '<p>Keine offenen Registrierungen.</p>';
+                    return;
+                }
+                bereich.innerHTML = `
+                    <table>
+                        <thead><tr><th>Name</th><th>E-Mail</th><th>Abteilung</th><th>Aktion</th></tr></thead>
+                        <tbody>${pending.map(u => `
+                            <tr>
+                                <td>${esc(u.firstName)} ${esc(u.secondName)}</td>
+                                <td>${esc(u.email)}</td>
+                                <td>${esc(u.departmentName || '—')}</td>
+                                <td>
+                                    <button class="btn-gruen btn-mini" onclick="freischalten(${u.id})">Freischalten</button>
+                                    <button class="btn-rot btn-mini" onclick="ablehnen(${u.id})">Ablehnen</button>
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+            } catch (e) {
+                bereich.innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+
+        async function freischalten(id) {
+            try {
+                await api(`/api/user/${id}/approve`, { method: 'POST' });
+                setFeedback('Benutzer freigeschaltet.', true);
+                await pendingLaden(); await userLaden();
+            } catch (e) { setFeedback(e.message, false); }
+        }
+
+        async function ablehnen(id) {
+            if (!confirm('Diese Registrierung wirklich ablehnen?')) return;
+            try {
+                await api(`/api/user/${id}`, { method: 'DELETE' });
+                setFeedback('Registrierung abgelehnt.', true);
+                await pendingLaden(); await userLaden();
+            } catch (e) { setFeedback(e.message, false); }
+        }
+
+        // ---- Alle Benutzer ----
+        async function userLaden() {
+            const bereich = document.getElementById('userBereich');
+            try {
+                const users = await api('/api/user');
+                const mich = await getMich();
+                bereich.innerHTML = `
+                    <table>
+                        <thead><tr>
+                            <th>Name</th><th>E-Mail</th><th>Rolle</th><th>Abteilung</th><th>Status</th><th>Aktion</th>
+                        </tr></thead>
+                        <tbody>${users.map(u => `
+                            <tr>
+                                <td>${esc(u.firstName)} ${esc(u.secondName)}</td>
+                                <td>${esc(u.email)}</td>
+                                <td>
+                                    <select id="rolle-${u.id}" ${u.id === mich.id ? 'disabled' : ''}>
+                                        <option value="0" ${u.role === 'Admin' ? 'selected' : ''}>Admin</option>
+                                        <option value="1" ${u.role === 'Support' ? 'selected' : ''}>Support</option>
+                                        <option value="2" ${u.role === 'User' ? 'selected' : ''}>User</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select id="abt-${u.id}">${abteilungOptions(u.departmentName)}</select>
+                                </td>
+                                <td><span class="${u.isActivated ? 'akt-an' : 'akt-aus'}">${u.isActivated ? 'aktiv' : 'gesperrt'}</span></td>
+                                <td>
+                                    <button class="btn-grau btn-mini" onclick="userSpeichern(${u.id})">Speichern</button>
+                                    ${u.id === mich.id ? '' :
+                                        (u.isActivated
+                                            ? `<button class="btn-rot btn-mini" onclick="sperren(${u.id})">Sperren</button>`
+                                            : `<button class="btn-gruen btn-mini" onclick="entsperren(${u.id})">Entsperren</button>`)}
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+            } catch (e) {
+                bereich.innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+
+        async function userSpeichern(id) {
+            const rolle = parseInt(document.getElementById(`rolle-${id}`).value);
+            const abteilung = document.getElementById(`abt-${id}`).value;
+            try {
+                await api(`/api/user/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ role: rolle, departmentName: abteilung || null })
+                });
+                setFeedback('Änderung gespeichert.', true);
+                await userLaden();
+            } catch (e) { setFeedback(e.message, false); }
+        }
+
+        // "Sperren" = Konto deaktivieren (IsActivated=false). Login wird blockiert.
+        async function sperren(id) {
+            try {
+                await api(`/api/user/${id}`, { method: 'PUT', body: JSON.stringify({ isActivated: false }) });
+                setFeedback('Benutzer gesperrt.', true);
+                await userLaden();
+            } catch (e) { setFeedback(e.message, false); }
+        }
+        async function entsperren(id) {
+            try {
+                await api(`/api/user/${id}`, { method: 'PUT', body: JSON.stringify({ isActivated: true }) });
+                setFeedback('Benutzer entsperrt.', true);
+                await userLaden();
+            } catch (e) { setFeedback(e.message, false); }
+        }
+    </script>
+</body>
+</html>

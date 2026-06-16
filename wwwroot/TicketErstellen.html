@@ -1,7 +1,11 @@
 ﻿<!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <title>Ticket erstellen</title>
+    <!-- style.css zuerst, damit die folgenden Seiten-eigenen Styles bei
+         Konflikten Vorrang behalten; liefert die Dropdown-Sidebar-Klassen. -->
+    <link rel="stylesheet" href="/style.css">
     <style>
         /* Grundlayout */
         body {
@@ -352,14 +356,8 @@
 </head>
 <body>
 
-    <!-- Linke Sidebar Navigation -->
-    <div class="sidebar">
-        <h2>Ticket System</h2>
-        <a href="/startseite.html">Meine Tickets</a>
-        <a href="/ticket-erstellen.html">Ticket erstellen</a>
-        <a href="/problemMelden.html">Problem melden</a>
-        <a href="#" class="abmelden" onclick="abmelden()">Ausloggen</a>
-    </div>
+    <!-- Linke Sidebar (wird per app.js als Dropdown-Menü befüllt) -->
+    <div class="sidebar" id="sidebar"></div>
 
     <!-- Hauptbereich -->
     <div class="main">
@@ -388,20 +386,25 @@
                 <div id="schritt-1">
                     <h2>Kontakt</h2>
 
-                    <!-- Vorname und Nachname nebeneinander -->
+                    <p style="color:gray; font-size:13px; margin:0 0 10px">
+                        Diese Kontaktdaten stammen aus deinem Konto und werden
+                        automatisch übernommen.
+                    </p>
+
+                    <!-- Vorname und Nachname nebeneinander – aus dem Konto, gesperrt -->
                     <div class="zeile">
                         <div>
                             <label>Vorname</label>
-                            <input type="text" id="vorname" placeholder="Vorname">
+                            <input type="text" id="vorname" readonly style="background:#eee; cursor:not-allowed">
                         </div>
                         <div>
                             <label>Nachname</label>
-                            <input type="text" id="nachname" placeholder="Nachname">
+                            <input type="text" id="nachname" readonly style="background:#eee; cursor:not-allowed">
                         </div>
                     </div>
 
                     <label>E-Mail Adresse</label>
-                    <input type="email" id="email" placeholder="email@firma.com">
+                    <input type="email" id="email" readonly style="background:#eee; cursor:not-allowed">
 
                     <!-- Zusätzliche Kontakte -->
                     <label>Zusätzliche Kontakte</label>
@@ -457,12 +460,14 @@
                         </label>
                     </div>
 
-                    <!-- Abteilung als freies Eingabefeld -->
+                    <!-- Abteilung als Auswahl (vom Backend geladen) -->
                     <label>Abteilung</label>
-                    <input type="text" id="abteilung" placeholder="z.B. Buchhaltung, IT, Vertrieb">
+                    <select id="abteilung">
+                        <option value="">Bitte wählen...</option>
+                    </select>
 
-                    <!-- Komponente als freies Eingabefeld -->
-                    <label>Komponente</label>
+                    <!-- Komponente / Thema als freies Eingabefeld -->
+                    <label>Komponente / Thema</label>
                     <input type="text" id="komponente"
                            placeholder="z.B. SAP, Zeiterfassung, Internetseite">
                 </div>
@@ -472,7 +477,11 @@
                     <h2>Beschreibung</h2>
 
                     <label>Titel</label>
-                    <input type="text" id="titel" placeholder="Kurze prägnante Beschreibung des Problems">
+                    <input type="text" id="titel" placeholder="Kurze prägnante Beschreibung des Problems"
+                           oninput="vorschlaegeLaden()">
+
+                    <!-- Lösungsvorschläge aus der Wissensdatenbank -->
+                    <div id="vorschlaege" style="margin-top:10px;"></div>
 
                     <!-- 3 Tabs: Szenario, Erwartetes Ergebnis, Aktuelles Ergebnis -->
                     <div class="tabs" style="margin-top:20px">
@@ -591,12 +600,16 @@
         </div>
     </div>
 
+    <script src="/app.js"></script>
     <script>
         // Beim Laden der Seite prüfen ob der User eingeloggt ist
         const token = localStorage.getItem('meinToken');
         if (!token) {
             window.location.href = '/index.html';
         }
+
+        // Dropdown-Sidebar aufbauen (Menüpunkt "Ticket erstellen" aktiv)
+        seitenleisteAufbauen('erstellen');
 
         // Benutzername laden
         async function benutzerLaden() {
@@ -606,11 +619,89 @@
                 });
                 const ich = await response.json();
                 document.getElementById('benutzername').innerText = `👤 ${ich.email}`;
+
+                // Kontaktdaten automatisch aus dem eingeloggten Konto füllen.
+                // Die Felder sind readonly – der Ersteller wird ohnehin
+                // serverseitig aus dem JWT gesetzt (CreatedByUserId).
+                document.getElementById('vorname').value = ich.firstName || '';
+                document.getElementById('nachname').value = ich.secondName || '';
+                document.getElementById('email').value = ich.email || '';
             } catch (e) {
                 console.error('Fehler beim Laden des Benutzers', e);
             }
         }
         benutzerLaden();
+
+        // Abteilungen vom Backend in die Auswahlliste laden.
+        // Das Backend akzeptiert nur existierende Abteilungsnamen, daher
+        // dürfen wir hier kein freies Textfeld verwenden.
+        async function abteilungenLaden() {
+            try {
+                const response = await fetch('/api/metadata/departments', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const abteilungen = await response.json();
+                const sel = document.getElementById('abteilung');
+                abteilungen.forEach(a => {
+                    const o = document.createElement('option');
+                    o.value = a.name;
+                    o.textContent = a.name;
+                    sel.appendChild(o);
+                });
+            } catch (e) {
+                console.error('Abteilungen konnten nicht geladen werden', e);
+            }
+        }
+        abteilungenLaden();
+
+        // ---- Lösungsvorschläge aus der Wissensdatenbank ----
+        // Beim Tippen des Titels passende Artikel vorschlagen (mit Debounce).
+        let vorschlagTimer = null;
+        function vorschlaegeLaden() {
+            clearTimeout(vorschlagTimer);
+            vorschlagTimer = setTimeout(vorschlaegeAbrufen, 350);
+        }
+
+        async function vorschlaegeAbrufen() {
+            const titel = document.getElementById('titel').value.trim();
+            const box = document.getElementById('vorschlaege');
+            if (titel.length < 3) { box.innerHTML = ''; return; }
+            try {
+                const res = await fetch('/api/knowledge/suggest?q=' + encodeURIComponent(titel), {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) { box.innerHTML = ''; return; }
+                const treffer = await res.json();
+                if (!treffer.length) { box.innerHTML = ''; return; }
+
+                box.innerHTML = `
+                    <div style="background:#eaf6ff; border:1px solid #b6e0fe; border-radius:8px; padding:12px;">
+                        <strong style="color:#2c3e50">💡 Vielleicht hilft das schon weiter:</strong>
+                        ${treffer.map((t, i) => `
+                            <div style="margin-top:8px;">
+                                <a href="#" onclick="vorschlagToggle(${i}); return false;"
+                                   style="color:#1a73e8; font-weight:bold; text-decoration:none;">
+                                   ${escHtml(t.title)}
+                                </a>
+                                <div id="vsol-${i}" style="display:none; margin-top:4px; white-space:pre-wrap; color:#333;">
+                                    ${escHtml(t.solution)}
+                                </div>
+                            </div>`).join('')}
+                    </div>`;
+            } catch { box.innerHTML = ''; }
+        }
+
+        function vorschlagToggle(i) {
+            const el = document.getElementById('vsol-' + i);
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // Kleines HTML-Escaping (app.js hat 'esc', aber wir bleiben hier eigenständig)
+        function escHtml(s) {
+            return String(s || '')
+                .replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+        }
 
         // Aktueller Schritt – startet bei 1
         let aktuellerSchritt = 1;
@@ -643,6 +734,18 @@
                 if (!prioritaet) {
                     feedback.innerHTML =
                         `<span style="color:red">❌ Bitte eine Priorität auswählen!</span>`;
+                    return;
+                }
+                // Abteilung und Thema sind Pflicht (Backend verlangt sie).
+                if (!document.getElementById('abteilung').value) {
+                    feedback.innerHTML =
+                        `<span style="color:red">❌ Bitte eine Abteilung wählen!</span>`;
+                    return;
+                }
+                const komp = document.getElementById('komponente').value.trim();
+                if (komp.length < 2) {
+                    feedback.innerHTML =
+                        `<span style="color:red">❌ Bitte ein Thema/Komponente (min. 2 Zeichen) angeben!</span>`;
                     return;
                 }
             }
@@ -781,18 +884,22 @@
             // Alle Daten sammeln
             const prioritaet = document.querySelector('input[name="prioritaet"]:checked').value;
             const titel = document.getElementById('titel').value;
-            const szenario = document.getElementById('szenario').value;
-            const erwartet = document.getElementById('erwartet').value;
-            const aktuell = document.getElementById('aktuell').value;
+            const szenario = document.getElementById('szenario').value.trim();
+            const erwartet = document.getElementById('erwartet').value.trim();
+            const aktuell = document.getElementById('aktuell').value.trim();
             const abteilung = document.getElementById('abteilung').value;
-            const komponente = document.getElementById('komponente').value;
+            const komponente = document.getElementById('komponente').value.trim();
 
-            // Beschreibung aus den 3 Tabs zusammenbauen
-            const beschreibung =
-                `Szenario:\n${szenario}\n\nErwartetes Ergebnis:\n${erwartet}\n\nAktuelles Ergebnis:\n${aktuell}`;
+            // Das Backend (CreateTicketDto) verlangt Beschreibung, erwartetes
+            // und aktuelles Ergebnis als Pflichtfelder.
+            if (!szenario || !erwartet || !aktuell) {
+                feedback.innerHTML =
+                    `<span style="color:red">Bitte Szenario, erwartetes und aktuelles Ergebnis (Schritt 3) ausfüllen!</span>`;
+                return;
+            }
 
             try {
-                // Ticket ans Backend schicken
+                // Ticket ans Backend schicken – Felder passend zum CreateTicketDto
                 const response = await fetch('/api/ticket', {
                     method: 'POST',
                     headers: {
@@ -800,10 +907,15 @@
                         'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
-                        title: titel,
-                        description: beschreibung,
                         priority: parseInt(prioritaet),
-                        category: 0  // Normal = 0
+                        title: titel,
+                        description: szenario,
+                        expectedResult: erwartet,
+                        actualResult: aktuell,
+                        agreedBilling: document.getElementById('agreeBilling').checked,
+                        agreedAGB: document.getElementById('agreeAgb').checked,
+                        departmentName: abteilung,
+                        subjectName: komponente
                     })
                 });
 
@@ -813,9 +925,15 @@
                         `<span style="color:green">Ticket wurde erfolgreich erstellt!</span>`;
                     setTimeout(() => {
                         window.location.href = '/startseite.html';
-                    }, 2000); // Nach 2 Sekunden weiterleiten
+                    }, 1500);
                 } else {
-                    feedback.innerHTML = `<span style="color:red">Fehler beim Erstellen!</span>`;
+                    let msg = 'Fehler beim Erstellen!';
+                    try {
+                        const body = await response.json();
+                        if (body.errors) msg = Object.values(body.errors).flat().join(' ');
+                        else if (typeof body === 'string') msg = body;
+                    } catch { /* kein JSON */ }
+                    feedback.innerHTML = `<span style="color:red">${msg}</span>`;
                 }
             } catch (e) {
                 feedback.innerHTML = `<span style="color:red">Server nicht erreichbar!</span>`;

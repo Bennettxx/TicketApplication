@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Wissensdatenbank</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .grid { display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
+        .spalte-links { flex:2; min-width:340px; }
+        .spalte-rechts { flex:1; min-width:280px; }
+        .art-zeile { padding:10px 0; border-bottom:1px solid #eee; }
+        .art-zeile .titel { font-weight:bold; color:#2c3e50; }
+        .art-aktionen button { padding:4px 10px; font-size:13px; }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+
+    <div class="main">
+        <span class="benutzer" id="benutzername">...</span>
+        <h1>Wissensdatenbank</h1>
+        <p style="color:#555">Artikel mit Lösungen. Beim Ticket-Erstellen werden passende Artikel automatisch vorgeschlagen.</p>
+        <p id="feedback" class="mini"></p>
+
+        <div class="grid">
+            <div class="spalte-links">
+                <div class="karte" id="listeBereich">Lädt...</div>
+            </div>
+
+            <div class="spalte-rechts">
+                <div class="karte">
+                    <h3 style="margin-top:0" id="formTitel">Neuer Artikel</h3>
+                    <input type="hidden" id="artId">
+                    <label>Titel / Problem</label>
+                    <input type="text" id="artTitel" maxlength="200">
+                    <label>Stichwörter (für die Suche, durch Leerzeichen getrennt)</label>
+                    <input type="text" id="artKeywords" maxlength="300" placeholder="z.B. drucker toner papier">
+                    <label>Lösung</label>
+                    <textarea id="artSolution" rows="6" maxlength="5000"></textarea>
+                    <label>Abteilung (optional)</label>
+                    <select id="artAbteilung"><option value="">— keine —</option></select>
+                    <label style="font-weight:normal; margin-top:10px;">
+                        <input type="checkbox" id="artPublish" checked style="width:auto;"> Veröffentlicht (wird vorgeschlagen)
+                    </label>
+                    <div style="margin-top:12px;">
+                        <button class="btn-gruen" onclick="speichern()">Speichern</button>
+                        <button class="btn-grau" onclick="formularLeeren()">Neu</button>
+                    </div>
+                    <span id="formFeedback" class="mini"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+    <script>
+        (async function () {
+            await seitenleisteAufbauen('wissen');
+            const mich = await getMich();
+            if (!istStaff(mich)) {
+                document.querySelector('.main').innerHTML =
+                    '<p class="feedback-rot">Kein Zugriff. Nur Admin/Support.</p>';
+                return;
+            }
+            await abteilungenLaden();
+            await listeLaden();
+        })();
+
+        async function abteilungenLaden() {
+            try {
+                const abt = await api('/api/metadata/departments');
+                const sel = document.getElementById('artAbteilung');
+                abt.forEach(a => {
+                    const o = document.createElement('option');
+                    o.value = a.name; o.textContent = a.name;
+                    sel.appendChild(o);
+                });
+            } catch { /* ignore */ }
+        }
+
+        let ARTIKEL = [];
+        async function listeLaden() {
+            const bereich = document.getElementById('listeBereich');
+            try {
+                ARTIKEL = await api('/api/knowledge');
+                if (!ARTIKEL.length) { bereich.innerHTML = '<p>Noch keine Artikel.</p>'; return; }
+                bereich.innerHTML = ARTIKEL.map(a => `
+                    <div class="art-zeile">
+                        <div class="titel">${esc(a.title)} ${a.isPublished ? '' : '<span class="badge" style="background:#6c757d">Entwurf</span>'}</div>
+                        <div class="mini">${esc(a.keywords)}</div>
+                        <div class="art-aktionen" style="margin-top:6px;">
+                            <button class="btn-grau" onclick="bearbeiten(${a.id})">Bearbeiten</button>
+                            <button class="btn-rot" onclick="loeschen(${a.id})">Löschen</button>
+                        </div>
+                    </div>`).join('');
+            } catch (e) {
+                bereich.innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+
+        function formularLeeren() {
+            document.getElementById('artId').value = '';
+            document.getElementById('artTitel').value = '';
+            document.getElementById('artKeywords').value = '';
+            document.getElementById('artSolution').value = '';
+            document.getElementById('artAbteilung').value = '';
+            document.getElementById('artPublish').checked = true;
+            document.getElementById('formTitel').innerText = 'Neuer Artikel';
+            document.getElementById('formFeedback').textContent = '';
+        }
+
+        function bearbeiten(id) {
+            const a = ARTIKEL.find(x => x.id === id);
+            if (!a) return;
+            document.getElementById('artId').value = a.id;
+            document.getElementById('artTitel').value = a.title;
+            document.getElementById('artKeywords').value = a.keywords;
+            document.getElementById('artSolution').value = a.solution;
+            document.getElementById('artAbteilung').value = a.departmentName || '';
+            document.getElementById('artPublish').checked = a.isPublished;
+            document.getElementById('formTitel').innerText = `Artikel #${a.id} bearbeiten`;
+            window.scrollTo(0, 0);
+        }
+
+        async function speichern() {
+            const fb = document.getElementById('formFeedback');
+            const id = document.getElementById('artId').value;
+            const body = {
+                title: document.getElementById('artTitel').value.trim(),
+                keywords: document.getElementById('artKeywords').value.trim(),
+                solution: document.getElementById('artSolution').value.trim(),
+                departmentName: document.getElementById('artAbteilung').value || null,
+                isPublished: document.getElementById('artPublish').checked
+            };
+            if (body.title.length < 3 || body.solution.length < 1) {
+                fb.textContent = 'Titel (min. 3 Zeichen) und Lösung sind Pflicht.'; return;
+            }
+            try {
+                if (id) {
+                    await api(`/api/knowledge/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+                } else {
+                    await api('/api/knowledge', { method: 'POST', body: JSON.stringify(body) });
+                }
+                formularLeeren();
+                await listeLaden();
+            } catch (e) { fb.textContent = e.message; }
+        }
+
+        async function loeschen(id) {
+            if (!confirm('Artikel wirklich löschen?')) return;
+            try {
+                await api(`/api/knowledge/${id}`, { method: 'DELETE' });
+                await listeLaden();
+            } catch (e) { document.getElementById('feedback').textContent = e.message; }
+        }
+    </script>
+</body>
+</html>

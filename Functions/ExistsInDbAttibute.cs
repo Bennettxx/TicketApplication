@@ -17,8 +17,12 @@ namespace TicketApplication.Functions
 
         protected override ValidationResult? IsValid(object? value, ValidationContext context)
         {
-            if (value == null)
-                return new ValidationResult("Wert darf nicht leer sein.");
+            // null wird durchgelassen: Optionale Felder (z.B. ein nicht
+            // angegebener Zusatz-Kontakt) sind erlaubt. Ob ein Wert PFLICHT ist,
+            // entscheidet ausschließlich [Required] – nicht dieses Attribut.
+            // Leere/Whitespace-Strings gelten ebenfalls als "nicht gesetzt".
+            if (value == null || (value is string s && string.IsNullOrWhiteSpace(s)))
+                return ValidationResult.Success;
 
             var db = context.GetRequiredService<ApplicationDbContext>();
 

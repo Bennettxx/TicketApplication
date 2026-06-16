@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Registrieren</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            background: #D3D3D3;
+        }
+        .box {
+            background: white;
+            padding: 50px;
+            border-radius: 15px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-top: 80px;
+            width: 320px;
+        }
+        h1 { margin-top: 0; color: #2c3e50; }
+        input {
+            display: block;
+            width: 100%;
+            margin: 8px 0;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        button {
+            width: 100%;
+            padding: 11px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            margin-top: 6px;
+        }
+        button:hover { background: #218838; }
+        .hinweis { font-size: 13px; color: #555; margin-top: 14px; text-align: center; }
+        a { color: #2c3e50; }
+        #feedback { margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>Registrieren</h1>
+
+        <input type="text" id="vorname" placeholder="Vorname">
+        <input type="text" id="nachname" placeholder="Nachname">
+        <input type="email" id="email" placeholder="E-Mail">
+        <select id="abteilung" style="display:block; width:100%; margin:8px 0; padding:10px; box-sizing:border-box; border:1px solid #ccc; border-radius:6px;">
+            <option value="">Abteilung wählen...</option>
+        </select>
+        <input type="password" id="pass" placeholder="Passwort">
+        <input type="password" id="pass2" placeholder="Passwort wiederholen">
+
+        <button onclick="registrieren()">Konto erstellen</button>
+        <p id="feedback"></p>
+
+        <p class="hinweis">
+            Neue Konten müssen von einem Admin freigeschaltet werden.<br>
+            Schon registriert? <a href="/index.html">Zum Login</a>
+        </p>
+    </div>
+
+    <script>
+        // Abteilungen laden (öffentlicher Endpunkt, kein Login nötig).
+        (async function () {
+            try {
+                const res = await fetch('/api/metadata/departments');
+                if (!res.ok) return;
+                const abt = await res.json();
+                const sel = document.getElementById('abteilung');
+                abt.forEach(a => {
+                    const o = document.createElement('option');
+                    o.value = a.name; o.textContent = a.name;
+                    sel.appendChild(o);
+                });
+            } catch { /* ignore */ }
+        })();
+
+        async function registrieren() {
+            const feedback = document.getElementById('feedback');
+            const vorname = document.getElementById('vorname').value.trim();
+            const nachname = document.getElementById('nachname').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const abteilung = document.getElementById('abteilung').value;
+            const pass = document.getElementById('pass').value;
+            const pass2 = document.getElementById('pass2').value;
+
+            if (!vorname || !nachname || !email || !abteilung || !pass) {
+                feedback.innerHTML = '<span style="color:red">Bitte alle Felder ausfüllen!</span>';
+                return;
+            }
+            if (pass !== pass2) {
+                feedback.innerHTML = '<span style="color:red">Passwörter stimmen nicht überein!</span>';
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        firstName: vorname,
+                        secondName: nachname,
+                        email: email,
+                        departmentName: abteilung,
+                        password: pass
+                    })
+                });
+
+                if (res.ok) {
+                    feedback.innerHTML =
+                        '<span style="color:green">Registrierung eingegangen! Ein Admin schaltet dein Konto frei.</span>';
+                    setTimeout(() => { window.location.href = '/index.html'; }, 2500);
+                } else {
+                    let msg = 'Registrierung fehlgeschlagen.';
+                    try {
+                        const body = await res.json();
+                        if (body.errors) msg = Object.values(body.errors).flat().join(' ');
+                        else if (typeof body === 'string') msg = body;
+                        else if (body.title) msg = body.title;
+                    } catch { /* kein JSON */ }
+                    feedback.innerHTML = `<span style="color:red">${msg}</span>`;
+                }
+            } catch (e) {
+                feedback.innerHTML = '<span style="color:red">Server nicht erreichbar!</span>';
+            }
+        }
+    </script>
+</body>
+</html>

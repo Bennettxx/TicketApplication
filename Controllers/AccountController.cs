@@ -31,6 +31,9 @@ namespace TicketApplication.Controllers
             if (user == null || !user.IsActive)
                 return NotFound();
 
+            string? departmentName = user.DepartmentId == null ? null : await _context.Departments
+                .Where(d => d.Id == user.DepartmentId).Select(d => d.Name).FirstOrDefaultAsync();
+
             return Ok(new UserResponseDto
             {
                 Id = user.Id,
@@ -38,7 +41,9 @@ namespace TicketApplication.Controllers
                 SecondName = user.SecondName,
                 Email = user.Email,
                 Role = user.Role.ToString(),
-                IsActivated = user.IsActivated
+                IsActivated = user.IsActivated,
+                DepartmentId = user.DepartmentId,
+                DepartmentName = departmentName
             });
         }
 

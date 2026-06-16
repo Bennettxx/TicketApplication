@@ -17,6 +17,9 @@ namespace TicketApplication.Data
         public DbSet<Ticket> Tickets { get; set; }
         public DbSet<TicketDialogue> TicketDialogue { get; set; }
         public DbSet<TicketTransaction> TicketTransactions { get; set; }
+        public DbSet<TicketTimeEntry> TicketTimeEntries { get; set; }
+        public DbSet<TicketAttachments> TicketAttachments { get; set; }
+        public DbSet<KnowledgeArticle> KnowledgeArticles { get; set; }
         public DbSet<Department> Departments { get; set; }
         public DbSet<Subject> Subjects { get; set; }
 
@@ -34,13 +37,43 @@ namespace TicketApplication.Data
                       .WithMany()
                       .HasForeignKey(t => t.TicketId);
             });
+
+            // TicketDialogue: eigener Auto-Increment-PK (Id), FK auf das Ticket
+            // über TicketId. Index auf TicketId, weil wir immer nach allen
+            // Nachrichten eines Tickets filtern.
             modelBuilder.Entity<TicketDialogue>(entity =>
             {
-                entity.HasKey(t => new { t.Id, t.TicketDialogueId });
-
+                entity.HasKey(t => t.Id);
                 entity.HasOne<Ticket>()
                       .WithMany()
-                      .HasForeignKey(t => t.Id);
+                      .HasForeignKey(t => t.TicketId);
+                entity.HasIndex(t => t.TicketId);
+            });
+
+            // TicketTimeEntry: eigener Auto-Increment-PK (Id), FK auf das Ticket.
+            modelBuilder.Entity<TicketTimeEntry>(entity =>
+            {
+                entity.HasKey(t => t.Id);
+                entity.HasOne<Ticket>()
+                      .WithMany()
+                      .HasForeignKey(t => t.TicketId);
+                entity.HasIndex(t => t.TicketId);
+            });
+
+            // TicketAttachments: eigener PK, FK auf das Ticket, Index auf TicketId.
+            modelBuilder.Entity<TicketAttachments>(entity =>
+            {
+                entity.HasKey(t => t.Id);
+                entity.HasOne<Ticket>()
+                      .WithMany()
+                      .HasForeignKey(t => t.TicketId);
+                entity.HasIndex(t => t.TicketId);
+            });
+
+            // KnowledgeArticle: eigener PK.
+            modelBuilder.Entity<KnowledgeArticle>(entity =>
+            {
+                entity.HasKey(t => t.Id);
             });
         }
 

@@ -68,11 +68,20 @@ namespace TicketApplication.Controllers
             // Passwort hashen
             string passwordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
 
+            // Abteilung auflösen (Existenz wurde im DTO geprüft).
+            var departmentId = await _context.Departments
+                .Where(d => d.Name == registerDto.DepartmentName)
+                .Select(d => (int?)d.Id)
+                .FirstOrDefaultAsync();
+
             var user = new User
             {
+                FirstName = registerDto.FirstName,
+                SecondName = registerDto.SecondName,
                 Email = registerDto.Email,
                 PasswordHash = passwordHash,
                 Role = UserRole.User,
+                DepartmentId = departmentId,
                 IsActive = true,
                 IsActivated = false   // muss erst durch einen Admin freigeschaltet werden
             };
