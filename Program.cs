@@ -125,14 +125,28 @@ if (app.Environment.IsDevelopment())
 // Leitet HTTP Aufrufe als HTTPS weiter
 app.UseHttpsRedirection();
 app.UseDefaultFiles(); // Sucht automatisch nach der index.html
-app.UseStaticFiles();  // Erlaubt das Ausliefern von HTML/CSS/JS
-   
+
+// Statische Dateien (HTML/CSS/JS) ausliefern.
+// In der ENTWICKLUNG setzen wir "no-cache", damit der Browser Änderungen an
+// wwwroot-Dateien SOFORT sieht und nicht eine alte Version aus dem Cache zeigt.
+// (Das war die Ursache, warum Frontend-Fixes scheinbar nicht ankamen.)
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (app.Environment.IsDevelopment())
+        {
+            ctx.Context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+            ctx.Context.Response.Headers["Pragma"] = "no-cache";
+            ctx.Context.Response.Headers["Expires"] = "0";
+        }
+    }
+});
 
 // Aktiviert oben definierte CORS-Regel "AllowAll"
-// Muss vor app.UseAuthentication() stehen, damit der Browser die Erlaubnis 
+// Muss vor app.UseAuthentication() stehen, damit der Browser die Erlaubnis
 // bekommt bevor er versucht sich einzuloggen.
 app.UseCors("AllowAll");
-app.UseStaticFiles();
 
 app.UseAuthentication();
 
