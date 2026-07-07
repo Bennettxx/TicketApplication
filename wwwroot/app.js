@@ -105,22 +105,26 @@ async function seitenleisteAufbauen(aktiv) {
     const gruppen = [
         {
             titel: 'Tickets', sichtbar: true, punkte: [
-                { key: 'tickets', label: 'Meine Tickets', href: '/startseite.html', sichtbar: true },
-                // Tickets erstellen/melden nur für die Rolle User.
+                { key: 'tickets', label: 'Offene Tickets', href: '/startseite.html', sichtbar: true },
+                { key: 'verlauf', label: 'Verlauf', href: '/verlauf.html', sichtbar: true },
+                // Ticket erstellen nur für die Rolle User.
                 { key: 'erstellen', label: 'Ticket erstellen', href: '/TicketErstellen.html', sichtbar: isUser },
-                { key: 'problem', label: 'Problem melden', href: '/problemMelden.html', sichtbar: isUser }
+                // Problem melden dürfen alle (funktioniert auch anonym).
+                { key: 'problem', label: 'Problem melden', href: '/problemMelden.html', sichtbar: true }
             ]
         },
         {
             titel: 'Bearbeitung', sichtbar: staff, punkte: [
                 { key: 'kanban', label: 'Kanban-Board', href: '/kanban.html', sichtbar: staff },
-                { key: 'wissen', label: 'Wissensdatenbank', href: '/wissen.html', sichtbar: staff }
+                { key: 'wissen', label: 'Wissensdatenbank', href: '/wissen.html', sichtbar: staff },
+                { key: 'themen', label: 'Themen', href: '/themen.html', sichtbar: staff }
             ]
         },
         {
             titel: 'Verwaltung', sichtbar: admin, punkte: [
                 { key: 'statistik', label: 'Statistik', href: '/statistik.html', sichtbar: admin },
-                { key: 'benutzer', label: 'Benutzer', href: '/benutzer.html', sichtbar: admin }
+                { key: 'benutzer', label: 'Benutzer', href: '/benutzer.html', sichtbar: admin },
+                { key: 'probleme', label: 'Problemmeldungen', href: '/probleme.html', sichtbar: admin }
             ]
         },
         {

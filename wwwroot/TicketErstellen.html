@@ -196,6 +196,7 @@
             border-radius: 8px;
             cursor: pointer;
             background: white;
+            color: #2c3e50; /* WICHTIG: sonst erbt der Button weiße Schrift aus style.css -> unsichtbar */
             font-size: 14px;
         }
 
@@ -462,14 +463,19 @@
 
                     <!-- Abteilung als Auswahl (vom Backend geladen) -->
                     <label>Abteilung</label>
-                    <select id="abteilung">
+                    <select id="abteilung" onchange="subjectsLaden()">
                         <option value="">Bitte wählen...</option>
                     </select>
 
-                    <!-- Komponente / Thema als freies Eingabefeld -->
+                    <!-- Komponente / Thema: verifizierte Themen als Auswahl,
+                         freie Eingabe neuer Themen weiterhin möglich (datalist). -->
                     <label>Komponente / Thema</label>
-                    <input type="text" id="komponente"
-                           placeholder="z.B. SAP, Zeiterfassung, Internetseite">
+                    <input type="text" id="komponente" list="subjectListe"
+                           placeholder="Thema wählen oder neu eingeben">
+                    <datalist id="subjectListe"></datalist>
+                    <p class="mini" style="color:gray; font-size:12px; margin:4px 0 0">
+                        Verifizierte Themen werden vorgeschlagen; neue Themen können frei eingegeben werden.
+                    </p>
                 </div>
 
                 <!-- ===== SCHRITT 3: BESCHREIBUNG ===== -->
@@ -635,6 +641,8 @@
         // Abteilungen vom Backend in die Auswahlliste laden.
         // Das Backend akzeptiert nur existierende Abteilungsnamen, daher
         // dürfen wir hier kein freies Textfeld verwenden.
+        const DEPT_MAP = {}; // Abteilungsname -> Id (für die Themen-Filterung)
+
         async function abteilungenLaden() {
             try {
                 const response = await fetch('/api/metadata/departments', {
@@ -643,6 +651,7 @@
                 const abteilungen = await response.json();
                 const sel = document.getElementById('abteilung');
                 abteilungen.forEach(a => {
+                    DEPT_MAP[a.name] = a.id;
                     const o = document.createElement('option');
                     o.value = a.name;
                     o.textContent = a.name;
@@ -653,6 +662,29 @@
             }
         }
         abteilungenLaden();
+
+        // Verifizierte Themen der gewählten Abteilung in die datalist laden.
+        async function subjectsLaden() {
+            const abteilung = document.getElementById('abteilung').value;
+            const datalist = document.getElementById('subjectListe');
+            datalist.innerHTML = '';
+            const depId = DEPT_MAP[abteilung];
+            if (!depId) return;
+            try {
+                const response = await fetch(
+                    `/api/metadata/subjects?verifiedOnly=true&departmentId=${depId}`,
+                    { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!response.ok) return;
+                const subjects = await response.json();
+                subjects.forEach(s => {
+                    const o = document.createElement('option');
+                    o.value = s.title;
+                    datalist.appendChild(o);
+                });
+            } catch (e) {
+                console.error('Themen konnten nicht geladen werden', e);
+            }
+        }
 
         // ---- Lösungsvorschläge aus der Wissensdatenbank ----
         // Beim Tippen des Titels passende Artikel vorschlagen (mit Debounce).
@@ -830,18 +862,28 @@
             }
         }
 
-        // Anhang zur Liste hinzufügen (nur Anzeige – keine echte Speicherung)
+        // Anhang zur Liste hinzufügen
         function anhangHinzufuegen() {
             const name = document.getElementById('anhangName').value;
             if (!name) return;
 
             const persoenlich = document.getElementById('persoenlicheDaten').checked;
-
-            // Zur Liste hinzufügen
             anhaenge.push({ name, persoenlich });
 
-            // Liste aktualisieren
+            // Eingabefelder leeren und Liste neu zeichnen
+            document.getElementById('anhangName').value = '';
+            document.getElementById('anhangFile').value = '';
+            document.getElementById('persoenlicheDaten').checked = false;
+            anhangRender();
+        }
+
+        // Zeichnet die Anhangliste neu (getrennt vom Hinzufügen!)
+        function anhangRender() {
             const liste = document.getElementById('anhangListe');
+            if (!anhaenge.length) {
+                liste.innerHTML = 'Noch keine Anhänge hinzugefügt.';
+                return;
+            }
             liste.innerHTML = anhaenge.map((a, i) => `
                 <div style="display:flex; gap:10px; align-items:center;
                             padding:8px; background:#f5f5f5; border-radius:8px; margin-top:5px">
@@ -852,32 +894,27 @@
                     <button class="btn-loeschen" onclick="anhangLoeschen(${i})">✕</button>
                 </div>
             `).join('');
-
-            // Felder leeren
-            document.getElementById('anhangName').value = '';
-            document.getElementById('anhangFile').value = '';
-            document.getElementById('persoenlicheDaten').checked = false;
         }
 
-        // Anhang aus der Liste entfernen
+        // Anhang aus der Liste entfernen – nur splicen und neu zeichnen.
         function anhangLoeschen(index) {
             anhaenge.splice(index, 1);
-            anhangHinzufuegen(); // Liste neu rendern
+            anhangRender();
         }
 
         // Ticket ans Backend schicken
         async function senden() {
             const feedback = document.getElementById('feedback');
 
-            // AGBs prüfen
-            if (!document.getElementById('agreeBilling').checked) {
+            // Beide Bestätigungen prüfen und ALLE fehlenden gesammelt anzeigen.
+            const fehlend = [];
+            if (!document.getElementById('agreeBilling').checked)
+                fehlend.push('Kosten bestätigen');
+            if (!document.getElementById('agreeAgb').checked)
+                fehlend.push('AGB zustimmen');
+            if (fehlend.length > 0) {
                 feedback.innerHTML =
-                    `<span style="color:red">Bitte bestätige dass das Ticket Kosten verursachen kann!</span>`;
-                return;
-            }
-            if (!document.getElementById('agreeAgb').checked) {
-                feedback.innerHTML =
-                    `<span style="color:red">Bitte stimme den AGB zu!</span>`;
+                    `<span style="color:red">Bitte noch bestätigen: ${fehlend.join(' und ')}.</span>`;
                 return;
             }
 

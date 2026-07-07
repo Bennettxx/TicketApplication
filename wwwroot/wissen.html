@@ -24,6 +24,9 @@
 
         <div class="grid">
             <div class="spalte-links">
+                <div class="karte" style="margin-bottom:12px;">
+                    <input type="text" id="aSuche" placeholder="Artikel suchen (Titel/Stichwörter/Lösung)..." oninput="artikelRender()">
+                </div>
                 <div class="karte" id="listeBereich">Lädt...</div>
             </div>
 
@@ -80,11 +83,21 @@
 
         let ARTIKEL = [];
         async function listeLaden() {
-            const bereich = document.getElementById('listeBereich');
             try {
                 ARTIKEL = await api('/api/knowledge');
-                if (!ARTIKEL.length) { bereich.innerHTML = '<p>Noch keine Artikel.</p>'; return; }
-                bereich.innerHTML = ARTIKEL.map(a => `
+                artikelRender();
+            } catch (e) {
+                document.getElementById('listeBereich').innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+
+        function artikelRender() {
+            const bereich = document.getElementById('listeBereich');
+            const q = document.getElementById('aSuche').value.trim().toLowerCase();
+            const liste = ARTIKEL.filter(a =>
+                !q || `${a.title} ${a.keywords} ${a.solution}`.toLowerCase().includes(q));
+            if (!liste.length) { bereich.innerHTML = '<p>Keine Artikel gefunden.</p>'; return; }
+            bereich.innerHTML = liste.map(a => `
                     <div class="art-zeile">
                         <div class="titel">${esc(a.title)} ${a.isPublished ? '' : '<span class="badge" style="background:#6c757d">Entwurf</span>'}</div>
                         <div class="mini">${esc(a.keywords)}</div>
@@ -93,9 +106,6 @@
                             <button class="btn-rot" onclick="loeschen(${a.id})">Löschen</button>
                         </div>
                     </div>`).join('');
-            } catch (e) {
-                bereich.innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
-            }
         }
 
         function formularLeeren() {

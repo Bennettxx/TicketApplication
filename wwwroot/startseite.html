@@ -24,15 +24,6 @@
                     <input type="text" id="fSuche" placeholder="Suchbegriff..." oninput="filterDebounce()">
                 </div>
                 <div style="flex:1; min-width:120px;">
-                    <label style="margin-top:0;">Status</label>
-                    <select id="fStatus" onchange="ladeMitFilter()">
-                        <option value="">Alle</option>
-                        <option value="0">Offen</option>
-                        <option value="1">In Bearbeitung</option>
-                        <option value="2">Geschlossen</option>
-                    </select>
-                </div>
-                <div style="flex:1; min-width:120px;">
                     <label style="margin-top:0;">Priorität</label>
                     <select id="fPrio" onchange="ladeMitFilter()">
                         <option value="">Alle</option>
@@ -46,6 +37,14 @@
                     <select id="fAbteilung" onchange="ladeMitFilter()">
                         <option value="">Alle</option>
                     </select>
+                </div>
+                <div style="flex:1; min-width:140px;">
+                    <label style="margin-top:0;">Erstellt von</label>
+                    <input type="date" id="fVon" onchange="ladeMitFilter()">
+                </div>
+                <div style="flex:1; min-width:140px;">
+                    <label style="margin-top:0;">Erstellt bis</label>
+                    <input type="date" id="fBis" onchange="ladeMitFilter()">
                 </div>
                 <div id="fZuweisungBox" style="flex:1; min-width:130px; display:none;">
                     <label style="margin-top:0;">Zuweisung</label>
@@ -76,10 +75,10 @@
 
             // Staff sieht ALLE Tickets, ein Kunde nur die eigenen.
             document.getElementById('ueberschrift').innerText =
-                IST_STAFF ? 'Alle Tickets' : 'Meine Tickets';
+                IST_STAFF ? 'Alle offenen Tickets' : 'Meine offenen Tickets';
             document.getElementById('hinweis').innerText = IST_STAFF
-                ? 'Übersicht aller Tickets. Für das Verschieben nutze das Kanban-Board.'
-                : 'Deine erstellten Tickets. Klicke ein Ticket an, um den Verlauf zu sehen.';
+                ? 'Offene Tickets. Geschlossene findest du unter „Verlauf".'
+                : 'Deine offenen Tickets. Geschlossene findest du unter „Verlauf".';
 
             // Zuweisungsfilter nur für Staff einblenden.
             if (IST_STAFF) document.getElementById('fZuweisungBox').style.display = 'block';
@@ -111,16 +110,20 @@
         // Baut die Query-Parameter aus der Filterleiste und lädt neu.
         async function ladeMitFilter() {
             const p = new URLSearchParams();
+            // Startseite zeigt ausschließlich offene (nicht geschlossene) Tickets.
+            p.set('activeOnly', 'true');
             const q = document.getElementById('fSuche').value.trim();
-            const status = document.getElementById('fStatus').value;
             const prio = document.getElementById('fPrio').value;
             const abt = document.getElementById('fAbteilung').value;
             const zuw = IST_STAFF ? document.getElementById('fZuweisung').value : '';
+            const von = document.getElementById('fVon').value;
+            const bis = document.getElementById('fBis').value;
             if (q) p.set('q', q);
-            if (status !== '') p.set('status', status);
             if (prio !== '') p.set('priority', prio);
             if (abt !== '') p.set('departmentId', abt);
             if (zuw) p.set('assignedTo', zuw);
+            if (von) p.set('createdFrom', von);
+            if (bis) p.set('createdTo', bis);
             await ticketsLaden(IST_STAFF, p.toString());
         }
 
@@ -137,7 +140,7 @@
                 let rows = tickets.map(t => `
                     <tr style="cursor:pointer" onclick="oeffne(${t.id})">
                         <td>#${t.id}</td>
-                        <td>${esc(t.title)}</td>
+                        <td>${esc(t.title)} ${t.hasUnreadReply ? '<span class="badge" style="background:#dc3545">Neue Antwort</span>' : ''}</td>
                         <td><span class="badge" style="background:${STATUS_FARBE[t.statusCode]}">${STATUS_TEXT[t.statusCode]}</span></td>
                         <td><span class="badge" style="background:${PRIO_FARBE[t.priorityCode]}">${PRIO_TEXT[t.priorityCode]}</span></td>
                         <td>${esc(t.departmentName)}</td>

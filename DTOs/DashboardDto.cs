@@ -17,6 +17,9 @@ namespace TicketApplication.DTOs
         public int MyAssignedOpenCount { get; set; } // mir zugewiesen und nicht geschlossen
         public int UnassignedOpenCount { get; set; } // offen und niemandem zugewiesen
 
+        // Anzahl Tickets mit ungelesener fremder Antwort (Benachrichtigung).
+        public int UnreadReplyCount { get; set; }
+
         // Letzte Tickets (Kurzform)
         public List<DashboardTicketDto> Recent { get; set; } = new();
     }

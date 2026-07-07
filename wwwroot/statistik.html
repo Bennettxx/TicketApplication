@@ -4,7 +4,12 @@
     <meta charset="utf-8">
     <title>Statistik</title>
     <link rel="stylesheet" href="/style.css">
+    <!-- Chart.js via CDN (benötigt Internetzugang beim Laden der Seite) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <style>
+        .diagramme { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 10px; }
+        .diagramm { flex: 1; min-width: 300px; background: white; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .diagramm h3 { margin: 0 0 10px; color: #2c3e50; font-size: 15px; }
         .balken-zelle { min-width: 160px; }
         .balken {
             height: 10px; border-radius: 5px; background: #1abc9c; display: inline-block;
@@ -20,6 +25,13 @@
         <span class="benutzer" id="benutzername">...</span>
         <h1>Statistik</h1>
         <p id="feedback" class="mini"></p>
+
+        <h2>Diagramme</h2>
+        <div class="diagramme">
+            <div class="diagramm"><h3>Bearbeitungszeit pro Abteilung (Min.)</h3><canvas id="chartAbteilung"></canvas></div>
+            <div class="diagramm"><h3>Bearbeitungszeit pro Bearbeiter (Min.)</h3><canvas id="chartAgent"></canvas></div>
+            <div class="diagramm"><h3>Ticketstatus</h3><canvas id="chartStatus"></canvas></div>
+        </div>
 
         <h2>Abteilungen</h2>
         <p style="color:#555">Bearbeitungszeit kategorisiert nach Abteilung des Erstellers (Kunden).</p>
@@ -47,7 +59,52 @@
             await abteilungenLaden();
             await agentsLaden();
             await kundenLaden();
+            await diagrammeLaden();
         })();
+
+        // Diagramme mit Chart.js rendern.
+        async function diagrammeLaden() {
+            if (typeof Chart === 'undefined') return; // CDN nicht geladen (offline)
+            try {
+                const [abt, agents, dash] = await Promise.all([
+                    api('/api/statistics/departments'),
+                    api('/api/statistics/agents'),
+                    api('/api/dashboard')
+                ]);
+
+                new Chart(document.getElementById('chartAbteilung'), {
+                    type: 'bar',
+                    data: {
+                        labels: abt.map(a => a.departmentName),
+                        datasets: [{ label: 'Minuten', data: abt.map(a => a.totalMinutes), backgroundColor: '#1abc9c' }]
+                    },
+                    options: { plugins: { legend: { display: false } }, responsive: true }
+                });
+
+                new Chart(document.getElementById('chartAgent'), {
+                    type: 'bar',
+                    data: {
+                        labels: agents.map(a => a.name || a.email),
+                        datasets: [{ label: 'Minuten', data: agents.map(a => a.totalMinutes), backgroundColor: '#2c3e50' }]
+                    },
+                    options: { indexAxis: 'y', plugins: { legend: { display: false } }, responsive: true }
+                });
+
+                new Chart(document.getElementById('chartStatus'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Offen', 'In Bearbeitung', 'Geschlossen'],
+                        datasets: [{
+                            data: [dash.openCount, dash.inProgressCount, dash.closedCount],
+                            backgroundColor: ['#6c757d', '#ffc107', '#28a745']
+                        }]
+                    },
+                    options: { responsive: true }
+                });
+            } catch (e) {
+                console.error('Diagramme konnten nicht geladen werden', e);
+            }
+        }
 
         // Hilfsfunktion: maximale Minuten für Balken-Skalierung.
         function maxMin(arr) { return Math.max(1, ...arr.map(x => x.totalMinutes)); }

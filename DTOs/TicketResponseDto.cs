@@ -25,6 +25,10 @@
         // Summe aller erfassten Bearbeitungsminuten dieses Tickets.
         public int TotalMinutes { get; set; }
 
+        // true, wenn es für den aktuellen Nutzer eine ungelesene fremde Antwort
+        // gibt (für die Kennzeichnung auf Startseite/Dashboard).
+        public bool HasUnreadReply { get; set; }
+
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public DateTime? ClosedAt { get; set; }

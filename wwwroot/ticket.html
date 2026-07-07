@@ -70,6 +70,15 @@
             <div class="spalte-rechts">
                 <div class="karte" id="infoKarte" style="margin-bottom:20px;">Lädt...</div>
 
+                <!-- Wiedereröffnen (nur wenn geschlossen) -->
+                <div class="karte" id="reopenKarte" style="display:none; margin-bottom:20px; border-left:4px solid #dc3545;">
+                    <h3 style="margin-top:0">Ticket wiedereröffnen</h3>
+                    <p class="mini">Dieses Ticket ist geschlossen. Zum Wiedereröffnen ist eine Nachricht erforderlich.</p>
+                    <textarea id="reopenText" rows="3" placeholder="Warum soll das Ticket wieder geöffnet werden?"></textarea>
+                    <button class="btn-gruen" style="margin-top:8px;" onclick="wiedereroeffnen()">Wiedereröffnen</button>
+                    <span id="reopenFeedback" class="mini"></span>
+                </div>
+
                 <!-- Anhänge (für alle, die das Ticket sehen dürfen) -->
                 <div class="karte" id="anhangKarte" style="margin-bottom:20px;">
                     <h3 style="margin-top:0">Anhänge</h3>
@@ -148,6 +157,9 @@
             await ticketLaden();
             await chatLaden();
             await anhangLaden();
+
+            // Als gelesen markieren -> Benachrichtigung verschwindet.
+            try { await api(`/api/ticket/${ticketId}/read`, { method: 'POST' }); } catch { }
         })();
 
         async function ticketLaden() {
@@ -177,7 +189,13 @@
                 if (istStaff(MICH)) {
                     document.getElementById('statusSelect').value = t.statusCode;
                     document.getElementById('assignSelect').value = t.assignedToEmail || '';
+                    // Geschlossen: Status-Auswahl sperren -> Wiedereröffnen nur über Nachricht.
+                    document.getElementById('statusSelect').disabled = (t.statusCode === 2);
                 }
+
+                // Wiedereröffnen-Karte nur bei geschlossenem Ticket zeigen (Ersteller + Staff).
+                document.getElementById('reopenKarte').style.display =
+                    (t.statusCode === 2) ? 'block' : 'none';
             } catch (e) {
                 document.getElementById('beschreibung').innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
             }
@@ -234,6 +252,23 @@
                 });
                 fb.textContent = 'Status gespeichert.';
                 await ticketLaden();
+            } catch (e) { fb.textContent = e.message; }
+        }
+
+        // Wiedereröffnen mit Pflicht-Nachricht.
+        async function wiedereroeffnen() {
+            const fb = document.getElementById('reopenFeedback');
+            const text = document.getElementById('reopenText').value.trim();
+            if (!text) { fb.textContent = 'Bitte eine Nachricht angeben.'; return; }
+            try {
+                await api(`/api/ticket/${ticketId}/reopen`, {
+                    method: 'POST',
+                    body: JSON.stringify({ message: text })
+                });
+                document.getElementById('reopenText').value = '';
+                fb.textContent = '';
+                await ticketLaden();
+                await chatLaden();
             } catch (e) { fb.textContent = e.message; }
         }
 

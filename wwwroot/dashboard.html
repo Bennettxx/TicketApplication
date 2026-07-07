@@ -52,6 +52,9 @@
                     { zahl: d.closedCount, label: 'Geschlossen', klasse: 'k-zu' },
                     { zahl: d.totalCount, label: 'Gesamt', klasse: '' }
                 ];
+                if (d.unreadReplyCount > 0) {
+                    kacheln.unshift({ zahl: d.unreadReplyCount, label: 'Neue Antworten', klasse: 'k-frei' });
+                }
                 if (d.isStaff) {
                     kacheln.push({ zahl: d.myAssignedOpenCount, label: 'Mir zugewiesen (offen)', klasse: 'k-ich' });
                     kacheln.push({ zahl: d.unassignedOpenCount, label: 'Nicht zugewiesen (offen)', klasse: 'k-frei' });

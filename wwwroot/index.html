@@ -8,15 +8,27 @@
             font-family: Arial; /*Schriftart für die  Seite*/
             display: flex; /* mact unsere box flexibel*/
             justify-content: center; /*Zentriert Login Fenster*/
-            background: #D3D3D3; /*unsere Farbe*/
+            min-height: 100vh;
+            margin: 0;
+            /* Farbverlauf als Hintergrund */
+            background: linear-gradient(135deg, #2c3e50 0%, #1abc9c 100%);
         }
         /*Unsere wiße box*/
         .box {
             background: white;
-            padding: 65px; /*Abstand zu unseren eingabefeldern*/
+            padding: 50px 55px; /*Abstand zu unseren eingabefeldern*/
             border-radius: 15px; /* damit macht man die Ecken rund*/
-            box-shadow: 0 0 10px rgba(0,0,0,0.1); /*Schatten*/
+            box-shadow: 0 8px 30px rgba(0,0,0,0.25); /*Schatten*/
             margin-top: 100px; /*Abstand des fensters vom oberen Rand*/
+            height: fit-content;
+            width: 300px;
+        }
+        /* Logo oben in der Box. Datei bitte als wwwroot/logo.png ablegen. */
+        .logo {
+            display: block;
+            max-width: 160px;
+            max-height: 80px;
+            margin: 0 auto 10px;
         }
 
         input {
@@ -27,19 +39,28 @@
         }
 
         button {
-            width: 111%;
-            padding: 10px; /*Dicke*/
+            width: 100%;
+            padding: 11px; /*Dicke*/
+            margin-top: 6px;
             background: #28a745;
             color: white; /*Schriftfarbe auf dem button*/
-            border: dotted solid double dashed; /*Rahmen (kann man auf "none" setzen)*/
+            border: none;
+            border-radius: 6px;
             cursor: pointer; /*Zeigt eine Hand Mausanzeiger*/
+        }
+        input {
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
         }
     </style>
 </head>
 <body>
 
     <div class="box">
-        <h1>Login</h1>
+        <!-- Logo: wird angezeigt, sobald wwwroot/logo.png existiert; sonst ausgeblendet -->
+        <img src="/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'">
+        <h1 style="text-align:center; color:#2c3e50; margin-top:0;">Login</h1>
 
         <input type="text" id="emailInput" placeholder="Email">
         <input type="password" id="passInput" placeholder="Password">
@@ -48,6 +69,9 @@
         <p id="feedback"></p>
         <p style="text-align:center; font-size:13px; margin-top:14px;">
             Noch kein Konto? <a href="/register.html">Jetzt registrieren</a>
+        </p>
+        <p style="text-align:center; font-size:13px; margin-top:4px;">
+            <a href="/problemMelden.html">Problem melden (ohne Login)</a>
         </p>
     </div>
 
@@ -71,7 +95,17 @@
                 localStorage.setItem('meinToken', daten.token);
                 window.location.href = '/startseite.html';
             } else {
-                feedback.innerHTML = `<span style="color:red">Login falsch!</span>`;
+                // Servermeldung anzeigen (z.B. "abgelehnt", "noch nicht freigeschaltet").
+                let msg = 'Login fehlgeschlagen.';
+                try {
+                    const body = await response.json();
+                    if (typeof body === 'string') msg = body;
+                    else if (body && body.title) msg = body.title;
+                } catch {
+                    const txt = await response.text().catch(() => '');
+                    if (txt) msg = txt;
+                }
+                feedback.innerHTML = `<span style="color:red">${msg}</span>`;
             }
         } catch (e) {
             feedback.innerHTML = `<span style="color:red">Server nicht erreichbar!</span>`;

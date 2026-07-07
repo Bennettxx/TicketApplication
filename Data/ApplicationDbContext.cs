@@ -20,6 +20,8 @@ namespace TicketApplication.Data
         public DbSet<TicketTimeEntry> TicketTimeEntries { get; set; }
         public DbSet<TicketAttachments> TicketAttachments { get; set; }
         public DbSet<KnowledgeArticle> KnowledgeArticles { get; set; }
+        public DbSet<Problem> Problems { get; set; }
+        public DbSet<TicketRead> TicketReads { get; set; }
         public DbSet<Department> Departments { get; set; }
         public DbSet<Subject> Subjects { get; set; }
 
@@ -74,6 +76,13 @@ namespace TicketApplication.Data
             modelBuilder.Entity<KnowledgeArticle>(entity =>
             {
                 entity.HasKey(t => t.Id);
+            });
+
+            // TicketRead: eigener PK, ein Eintrag pro (Ticket, User).
+            modelBuilder.Entity<TicketRead>(entity =>
+            {
+                entity.HasKey(t => t.Id);
+                entity.HasIndex(t => new { t.TicketId, t.UserId }).IsUnique();
             });
         }
 

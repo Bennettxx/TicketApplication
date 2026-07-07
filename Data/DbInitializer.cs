@@ -36,8 +36,8 @@ namespace TicketApplication.Data
             //   kunde@user.com    -> User    (eigene Tickets erstellen)
             if (!context.Users.Any())
             {
-                // Abteilungs-Ids per Name auflösen.
-                int? itDep = context.Departments.Where(d => d.Name == "IT Support").Select(d => (int?)d.Id).FirstOrDefault();
+                // Abteilungs-Id für den Kunden auflösen.
+                // Admin/Support bekommen KEINE Abteilung (DepartmentId = null).
                 int? einkaufDep = context.Departments.Where(d => d.Name == "Einkauf").Select(d => (int?)d.Id).FirstOrDefault();
 
                 context.Users.AddRange(
@@ -48,7 +48,7 @@ namespace TicketApplication.Data
                         Email = "admin@user.com",
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
                         Role = UserRole.Admin,
-                        DepartmentId = itDep,
+                        DepartmentId = null,
                         IsActivated = true,
                         IsActive = true
                     },
@@ -59,7 +59,7 @@ namespace TicketApplication.Data
                         Email = "support@user.com",
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
                         Role = UserRole.Support,
-                        DepartmentId = itDep,
+                        DepartmentId = null,
                         IsActivated = true,
                         IsActive = true
                     },

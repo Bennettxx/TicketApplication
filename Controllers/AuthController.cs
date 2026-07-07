@@ -32,21 +32,28 @@ namespace TicketApplication.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
-            // User suchen (muss aktiv sein!)
+            // User suchen (auch inaktive, um "abgelehnt" erkennen zu können).
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == loginDto.Email && u.IsActive);
+                .FirstOrDefaultAsync(u => u.Email == loginDto.Email);
 
             if (user == null) return Unauthorized("Ungültige E-Mail oder Passwort.");
 
-            // Freischaltung durch Admin prüfen
+            // Passwort ZUERST prüfen, damit wir den Kontostatus nicht an
+            // beliebige Fremde preisgeben (Schutz gegen Konto-Erkundung).
+            bool isValid = BCrypt.Net.BCrypt.Verify(loginDto.Password, user.PasswordHash);
+            if (!isValid) return Unauthorized("Ungültige E-Mail oder Passwort.");
+
+            // Abgelehnt / deaktiviert (Soft-Delete).
+            if (!user.IsActive)
+            {
+                return Unauthorized("Dein Konto wurde abgelehnt oder deaktiviert. Bitte wende dich an einen Administrator.");
+            }
+
+            // Noch nicht durch Admin freigeschaltet.
             if (!user.IsActivated)
             {
                 return Unauthorized("Konto wurde noch nicht durch einen Admin freigeschaltet.");
             }
-
-            // Passwort prüfen (BCrypt vergleicht den Hash)
-            bool isValid = BCrypt.Net.BCrypt.Verify(loginDto.Password, user.PasswordHash);
-            if (!isValid) return Unauthorized("Ungültige E-Mail oder Passwort.");
 
             // Token erstellen
             var token = CreateToken(user);

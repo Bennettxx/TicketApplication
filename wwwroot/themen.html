@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Themen verwalten</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+
+    <div class="main">
+        <span class="benutzer" id="benutzername">...</span>
+        <h1>Themen (Subjects)</h1>
+        <p style="color:#555">Beim Ticket-Erstellen entstehen neue Themen unverifiziert. Verifizierte Themen werden dort als Auswahl angeboten.</p>
+        <p id="feedback" class="mini"></p>
+
+        <!-- Such-/Filterleiste -->
+        <div class="karte" style="margin-bottom:16px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                <div style="flex:2; min-width:200px;">
+                    <label style="margin-top:0;">Suche</label>
+                    <input type="text" id="fSuche" placeholder="Thema suchen..." oninput="rendern()">
+                </div>
+                <div style="flex:1; min-width:140px;">
+                    <label style="margin-top:0;">Status</label>
+                    <select id="fStatus" onchange="rendern()">
+                        <option value="">Alle</option>
+                        <option value="0">Nur unverifiziert</option>
+                        <option value="1">Nur verifiziert</option>
+                    </select>
+                </div>
+                <div style="flex:1; min-width:160px;">
+                    <label style="margin-top:0;">Abteilung</label>
+                    <select id="fAbteilung" onchange="rendern()"><option value="">Alle</option></select>
+                </div>
+            </div>
+        </div>
+
+        <div id="bereich" class="karte">Lädt...</div>
+    </div>
+
+    <script src="/app.js"></script>
+    <script>
+        let SUBJECTS = [];
+        let DEPTMAP = {};   // id -> name
+        let MICH = null;
+
+        (async function () {
+            await seitenleisteAufbauen('themen');
+            MICH = await getMich();
+            if (!istStaff(MICH)) {
+                document.querySelector('.main').innerHTML = '<p class="feedback-rot">Kein Zugriff. Nur Admin/Support.</p>';
+                return;
+            }
+            await abteilungenLaden();
+            await laden();
+        })();
+
+        async function abteilungenLaden() {
+            try {
+                const abt = await api('/api/metadata/departments');
+                const sel = document.getElementById('fAbteilung');
+                abt.forEach(a => {
+                    DEPTMAP[a.id] = a.name;
+                    const o = document.createElement('option');
+                    o.value = a.id; o.textContent = a.name;
+                    sel.appendChild(o);
+                });
+            } catch { /* ignore */ }
+        }
+
+        async function laden() {
+            try {
+                SUBJECTS = await api('/api/subject');
+                rendern();
+            } catch (e) {
+                document.getElementById('bereich').innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+
+        function rendern() {
+            const q = document.getElementById('fSuche').value.trim().toLowerCase();
+            const status = document.getElementById('fStatus').value;
+            const dep = document.getElementById('fAbteilung').value;
+
+            let liste = SUBJECTS.filter(s => {
+                if (q && !s.title.toLowerCase().includes(q)) return false;
+                if (status === '1' && !s.isVerified) return false;
+                if (status === '0' && s.isVerified) return false;
+                if (dep && String(s.departmentId) !== dep) return false;
+                return true;
+            });
+
+            if (!liste.length) { document.getElementById('bereich').innerHTML = '<p>Keine Themen gefunden.</p>'; return; }
+
+            const istAdmin = MICH.role === 'Admin';
+            document.getElementById('bereich').innerHTML = `
+                <table>
+                    <thead><tr><th>Thema</th><th>Abteilung</th><th>Status</th><th>Aktion</th></tr></thead>
+                    <tbody>${liste.map(s => `
+                        <tr>
+                            <td>${esc(s.title)}</td>
+                            <td>${esc(DEPTMAP[s.departmentId] || '—')}</td>
+                            <td>${s.isVerified
+                                ? '<span class="badge" style="background:#28a745">verifiziert</span>'
+                                : '<span class="badge" style="background:#6c757d">offen</span>'}</td>
+                            <td>
+                                ${s.isVerified
+                                    ? `<button class="btn-grau" onclick="setVerify(${s.id}, false)">Zurücknehmen</button>`
+                                    : `<button class="btn-gruen" onclick="setVerify(${s.id}, true)">Verifizieren</button>`}
+                                ${istAdmin ? `<button class="btn-rot" onclick="loeschen(${s.id})">Löschen</button>` : ''}
+                            </td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>`;
+        }
+
+        async function setVerify(id, verify) {
+            try {
+                await api(`/api/subject/${id}/${verify ? 'verify' : 'unverify'}`, { method: 'PATCH' });
+                await laden();
+            } catch (e) { document.getElementById('feedback').textContent = e.message; }
+        }
+
+        async function loeschen(id) {
+            if (!confirm('Thema wirklich löschen?')) return;
+            try {
+                await api(`/api/subject/${id}`, { method: 'DELETE' });
+                await laden();
+            } catch (e) { document.getElementById('feedback').textContent = e.message; }
+        }
+    </script>
+</body>
+</html>

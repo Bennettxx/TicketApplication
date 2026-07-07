@@ -29,23 +29,31 @@ builder.Services.AddCors(options =>
     });
 });
 // =========================================================================
-// LOKALE KONFIGURATION
-// Lädt appsettings.Local.json zusätzlich zu appsettings.json.
-// Diese Datei steht in der .gitignore und enthält maschinenspezifische
-// Werte: Connection-String, JWT-Key. Gehört NICHT ins Repo.
+// KONFIGURATION – abhängig von der Umgebung
+//
+//  DEVELOPMENT: Werte kommen aus 'appsettings.Local.json' (maschinenspezifisch,
+//               steht in .gitignore). Fehlende Schlüssel (JWT/Anhang) werden
+//               automatisch erzeugt und dort gespeichert.
+//
+//  PRODUCTION:  Werte kommen ausschließlich aus UMGEBUNGSVARIABLEN
+//               (ConnectionStrings__DefaultConnection, Jwt__Key,
+//               Attachments__Key). Details: ANLEITUNG_UMGEBUNGSVARIABLEN.txt.
+//
+// Umgebungsvariablen sind vom Default-Host bereits als Konfigurationsquelle
+// registriert; wir laden die lokale JSON nur in der Entwicklung, damit sie in
+// Produktion NICHT die Umgebungsvariablen überschreibt.
 // =========================================================================
-builder.Configuration.AddJsonFile(
-    "appsettings.Local.json",
-    optional: true,
-    reloadOnChange: true);
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddJsonFile(
+        "appsettings.Local.json",
+        optional: true,
+        reloadOnChange: true);
 
-// JWT-Key prüfen — falls keiner gesetzt ist (z.B. beim allerersten Start),
-// einen kryptographisch sicheren generieren und in appsettings.Local.json
-// speichern. So bekommt jede Installation ihren eigenen einzigartigen Key.
-EnsureJwtKeyExists(builder);
-
-// Schlüssel für die Anhang-Verschlüsselung sicherstellen (analog zum JWT-Key).
-EnsureAttachmentKeyExists(builder);
+    // Fehlende Schlüssel lokal automatisch erzeugen und in Local.json ablegen.
+    EnsureJwtKeyExists(builder);
+    EnsureAttachmentKeyExists(builder);
+}
 
 // Connection-String prüfen — sonst kommt später eine sehr kryptische
 // Fehlermeldung aus dem EF-Core-Innern.
@@ -54,7 +62,21 @@ if (string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException(
         "ConnectionStrings:DefaultConnection ist nicht konfiguriert. " +
-        "Bitte 'appsettings.Local.json' anlegen — Vorlage: 'appsettings.Local.json.example'.");
+        "Development: 'appsettings.Local.json' anlegen. " +
+        "Production: Umgebungsvariable 'ConnectionStrings__DefaultConnection' setzen " +
+        "(siehe ANLEITUNG_UMGEBUNGSVARIABLEN.txt).");
+}
+
+// In Produktion müssen die sicherheitsrelevanten Schlüssel per Umgebungsvariable
+// gesetzt sein — es wird dort NICHTS automatisch generiert/geschrieben.
+if (!builder.Environment.IsDevelopment())
+{
+    if (string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Key"]))
+        throw new InvalidOperationException(
+            "Jwt:Key fehlt. In Produktion Umgebungsvariable 'Jwt__Key' setzen (siehe ANLEITUNG_UMGEBUNGSVARIABLEN.txt).");
+    if (string.IsNullOrWhiteSpace(builder.Configuration["Attachments:Key"]))
+        throw new InvalidOperationException(
+            "Attachments:Key fehlt. In Produktion Umgebungsvariable 'Attachments__Key' setzen (siehe ANLEITUNG_UMGEBUNGSVARIABLEN.txt).");
 }
 
 // Add services to the container. Auch Dependency Injection genannt - welche Services stehen später zur Verfügung.

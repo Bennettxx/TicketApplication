@@ -26,15 +26,43 @@
 
         <h2>Alle Benutzer</h2>
         <p style="color:#555">Rolle ändern oder Konto sperren/entsperren. Änderungen pro Zeile mit „Speichern" bestätigen.</p>
+
+        <div class="karte" style="margin-bottom:16px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                <div style="flex:2; min-width:200px;">
+                    <label style="margin-top:0;">Suche</label>
+                    <input type="text" id="uSuche" placeholder="Name oder E-Mail..." oninput="userRender()">
+                </div>
+                <div style="flex:1; min-width:130px;">
+                    <label style="margin-top:0;">Rolle</label>
+                    <select id="uRolle" onchange="userRender()">
+                        <option value="">Alle</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Support">Support</option>
+                        <option value="User">User</option>
+                    </select>
+                </div>
+                <div style="flex:1; min-width:130px;">
+                    <label style="margin-top:0;">Status</label>
+                    <select id="uStatus" onchange="userRender()">
+                        <option value="">Alle</option>
+                        <option value="1">aktiv</option>
+                        <option value="0">gesperrt</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <div id="userBereich" class="karte">Lädt...</div>
     </div>
 
     <script src="/app.js"></script>
     <script>
+        let MICH_CACHE = null;
         (async function () {
             await seitenleisteAufbauen('benutzer');
-            const mich = await getMich();
-            if (mich.role !== 'Admin') {
+            MICH_CACHE = await getMich();
+            if (MICH_CACHE.role !== 'Admin') {
                 document.querySelector('.main').innerHTML =
                     '<p class="feedback-rot">Kein Zugriff. Nur Admins.</p>';
                 return;
@@ -110,12 +138,35 @@
         }
 
         // ---- Alle Benutzer ----
+        let ALLE_USER = [];
         async function userLaden() {
-            const bereich = document.getElementById('userBereich');
             try {
-                const users = await api('/api/user');
-                const mich = await getMich();
-                bereich.innerHTML = `
+                ALLE_USER = await api('/api/user');
+                userRender();
+            } catch (e) {
+                document.getElementById('userBereich').innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+
+        function userRender() {
+            const bereich = document.getElementById('userBereich');
+            const q = document.getElementById('uSuche').value.trim().toLowerCase();
+            const rolle = document.getElementById('uRolle').value;
+            const status = document.getElementById('uStatus').value;
+            const mich = MICH_CACHE;
+
+            const users = ALLE_USER.filter(u => {
+                const name = `${u.firstName} ${u.secondName} ${u.email}`.toLowerCase();
+                if (q && !name.includes(q)) return false;
+                if (rolle && u.role !== rolle) return false;
+                if (status === '1' && !u.isActivated) return false;
+                if (status === '0' && u.isActivated) return false;
+                return true;
+            });
+
+            if (!users.length) { bereich.innerHTML = '<p>Keine Benutzer gefunden.</p>'; return; }
+
+            bereich.innerHTML = `
                     <table>
                         <thead><tr>
                             <th>Name</th><th>E-Mail</th><th>Rolle</th><th>Abteilung</th><th>Status</th><th>Aktion</th>

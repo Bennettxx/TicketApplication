@@ -111,17 +111,23 @@ namespace TicketApplication.Controllers
         // Optionale Query-Parameter (alle kombinierbar):
         //   q            Volltext in Titel/Beschreibung
         //   status       0=Offen, 1=In Bearbeitung, 2=Geschlossen
+        //   activeOnly   true = nur nicht-geschlossene Tickets (Startseite)
         //   priority     0=Low, 1=Medium, 2=High
         //   departmentId Abteilungs-Id
         //   assignedTo   "me" (mir zugewiesen) oder "none" (nicht zugewiesen) – nur Staff
+        //   createdFrom  Erstelldatum ab (inkl.)   – Filter nach Erstellungsdatum
+        //   createdTo    Erstelldatum bis (inkl. ganzer Tag)
         // -----------------------------------------------------------------
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TicketResponseDto>>> GetAll(
             [FromQuery] string? q,
             [FromQuery] int? status,
+            [FromQuery] bool activeOnly,
             [FromQuery] int? priority,
             [FromQuery] int? departmentId,
-            [FromQuery] string? assignedTo)
+            [FromQuery] string? assignedTo,
+            [FromQuery] DateTime? createdFrom,
+            [FromQuery] DateTime? createdTo)
         {
             IQueryable<Ticket> query = _context.Tickets;
 
@@ -135,12 +141,21 @@ namespace TicketApplication.Controllers
                 var term = q.Trim();
                 query = query.Where(t => t.Title.Contains(term) || t.Description.Contains(term));
             }
+            // activeOnly (Startseite): alles außer geschlossen.
+            if (activeOnly)
+                query = query.Where(t => t.Status != TicketStatus.Closed);
             if (status is >= 0 and <= 2)
                 query = query.Where(t => (int)t.Status == status);
             if (priority is >= 0 and <= 2)
                 query = query.Where(t => (int)t.Priority == priority);
             if (departmentId is > 0)
                 query = query.Where(t => t.DepartmentId == departmentId);
+
+            // Filter nach Erstellungsdatum.
+            if (createdFrom.HasValue)
+                query = query.Where(t => t.CreatedAt >= createdFrom.Value.Date);
+            if (createdTo.HasValue)
+                query = query.Where(t => t.CreatedAt < createdTo.Value.Date.AddDays(1));
 
             // Zuweisungsfilter nur für Staff sinnvoll.
             if (IsStaff && !string.IsNullOrWhiteSpace(assignedTo))
@@ -267,6 +282,11 @@ namespace TicketApplication.Controllers
             if (ticket.Status == dto.Status)
                 return NoContent(); // nichts zu tun
 
+            // Wiedereröffnen (Closed -> offen) NUR über den Reopen-Vorgang mit
+            // Pflicht-Nachricht. Über diesen Endpunkt nicht erlaubt.
+            if (ticket.Status == TicketStatus.Closed && dto.Status != TicketStatus.Closed)
+                return BadRequest("Zum Wiedereröffnen bitte den Wiedereröffnen-Vorgang mit Pflicht-Nachricht nutzen.");
+
             ticket.Status = dto.Status;
             ticket.UpdatedAt = DateTime.UtcNow;
 
@@ -285,6 +305,44 @@ namespace TicketApplication.Controllers
                     ticket.ClosedAt = null;
                     break;
             }
+
+            await WriteTransaction(ticket, userId);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        // -----------------------------------------------------------------
+        // POST /api/ticket/{id}/reopen  -> Geschlossenes Ticket wiedereröffnen.
+        // Erlaubt für Ersteller und Staff. Eine Nachricht ist PFLICHT und wird
+        // als Dialog-Eintrag gespeichert. Setzt den Status zurück auf Open.
+        // -----------------------------------------------------------------
+        [HttpPost("{id}/reopen")]
+        public async Task<IActionResult> Reopen(int id, ReopenTicketDto dto)
+        {
+            var ticket = await _context.Tickets.FindAsync(id);
+            if (ticket == null) return NotFound();
+
+            var userId = CurrentUserId;
+            if (!IsStaff && ticket.CreatedByUserId != userId)
+                return Forbid();
+
+            if (ticket.Status != TicketStatus.Closed)
+                return BadRequest("Nur geschlossene Tickets können wiedereröffnet werden.");
+
+            ticket.Status = TicketStatus.Open;
+            ticket.ClosedAt = null;
+            ticket.OpenedAt = DateTime.UtcNow;
+            ticket.UpdatedAt = DateTime.UtcNow;
+
+            // Pflicht-Nachricht als Dialog-Eintrag festhalten.
+            _context.TicketDialogue.Add(new TicketDialogue
+            {
+                TicketId = ticket.Id,
+                AuthorUserId = userId,
+                Text = dto.Message.Trim(),
+                IsInternal = false,
+                CreatedAt = DateTime.UtcNow
+            });
 
             await WriteTransaction(ticket, userId);
             await _context.SaveChangesAsync();
@@ -318,6 +376,39 @@ namespace TicketApplication.Controllers
 
             ticket.UpdatedAt = DateTime.UtcNow;
             await WriteTransaction(ticket, CurrentUserId);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        // -----------------------------------------------------------------
+        // POST /api/ticket/{id}/read  -> Ticket als "gelesen" markieren.
+        // Wird beim Öffnen der Detailseite aufgerufen; setzt den
+        // Zuletzt-gesehen-Zeitpunkt, wodurch die Antwort-Kennzeichnung verschwindet.
+        // -----------------------------------------------------------------
+        [HttpPost("{id}/read")]
+        public async Task<IActionResult> MarkRead(int id)
+        {
+            if (!await _context.Tickets.AnyAsync(t => t.Id == id))
+                return NotFound();
+
+            var userId = CurrentUserId;
+            var eintrag = await _context.TicketReads
+                .FirstOrDefaultAsync(r => r.TicketId == id && r.UserId == userId);
+
+            if (eintrag == null)
+            {
+                _context.TicketReads.Add(new TicketRead
+                {
+                    TicketId = id,
+                    UserId = userId,
+                    LastReadAt = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                eintrag.LastReadAt = DateTime.UtcNow;
+            }
+
             await _context.SaveChangesAsync();
             return NoContent();
         }
@@ -366,6 +457,11 @@ namespace TicketApplication.Controllers
         // (inkl. Namen, E-Mails und Summe der erfassten Minuten).
         private IQueryable<TicketResponseDto> ProjectTickets(IQueryable<Ticket> source)
         {
+            // Für die "ungelesene Antwort"-Kennzeichnung: aktueller Nutzer + Rolle
+            // werden als Konstanten in die Query eingebettet.
+            int currentUserId = CurrentUserId;
+            bool isStaff = IsStaff;
+
             return from t in source
                    join dep in _context.Departments on t.DepartmentId equals dep.Id into depJoin
                    from dep in depJoin.DefaultIfEmpty()
@@ -397,6 +493,18 @@ namespace TicketApplication.Controllers
                        TotalMinutes = _context.TicketTimeEntries
                            .Where(e => e.TicketId == t.Id)
                            .Sum(e => (int?)e.Minutes) ?? 0,
+                       // Ungelesene fremde Antwort? Nur für Beteiligte (Ersteller
+                       // oder Bearbeiter). Interne Notizen zählen nur für Staff.
+                       HasUnreadReply =
+                           (t.CreatedByUserId == currentUserId || t.AssignedToId == currentUserId) &&
+                           _context.TicketDialogue.Any(d =>
+                               d.TicketId == t.Id &&
+                               d.AuthorUserId != currentUserId &&
+                               (isStaff || !d.IsInternal) &&
+                               d.CreatedAt > (_context.TicketReads
+                                   .Where(r => r.TicketId == t.Id && r.UserId == currentUserId)
+                                   .Select(r => (DateTime?)r.LastReadAt)
+                                   .FirstOrDefault() ?? DateTime.MinValue)),
                        CreatedAt = t.CreatedAt,
                        UpdatedAt = t.UpdatedAt,
                        ClosedAt = t.ClosedAt

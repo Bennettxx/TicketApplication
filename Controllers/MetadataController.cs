@@ -36,13 +36,17 @@ namespace TicketApplication.Controllers
             return Ok(list);
         }
 
-        // GET /api/metadata/subjects -> Liste der Themen, optional pro Abteilung.
+        // GET /api/metadata/subjects -> Liste der Themen, optional pro Abteilung
+        // und optional nur verifizierte (für das Dropdown beim Ticket-Erstellen).
         [HttpGet("subjects")]
-        public async Task<ActionResult<IEnumerable<SubjectDto>>> Subjects([FromQuery] int? departmentId)
+        public async Task<ActionResult<IEnumerable<SubjectDto>>> Subjects(
+            [FromQuery] int? departmentId, [FromQuery] bool verifiedOnly = false)
         {
             var query = _context.Subjects.AsQueryable();
             if (departmentId.HasValue)
                 query = query.Where(s => s.DepartmentId == departmentId.Value);
+            if (verifiedOnly)
+                query = query.Where(s => s.IsVerified);
 
             var list = await query
                 .OrderBy(s => s.Title)

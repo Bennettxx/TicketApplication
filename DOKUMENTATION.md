@@ -100,8 +100,8 @@ dieselbe Codierung).
 ### 3.4 `ApplicationDbContext`
 Bildet die Datenbank ab und stellt den Zugriff bereit.
 - **DbSets:** `Users`, `Tickets`, `TicketDialogue`, `TicketTransactions`,
-  `TicketTimeEntries`, `TicketAttachments`, `KnowledgeArticles`, `Departments`,
-  `Subjects`.
+  `TicketTimeEntries`, `TicketAttachments`, `KnowledgeArticles`, `Problems`,
+  `TicketReads`, `Departments`, `Subjects`.
 - **`OnModelCreating`** legt Schlüssel/Beziehungen fest:
   - `TicketTransaction`: zusammengesetzter Schlüssel `{TicketId, TransactionId}`,
     FK auf `Ticket`.
@@ -193,7 +193,19 @@ Ein Wissensartikel / Lösungsvorschlag.
 ### 4.8 `Department`, `Subject`
 - `Department`: `Id`, `Name`.
 - `Subject`: `Id`, `Title`, `DepartmentId`, `IsVerified`. Themen können beim
-  Ticket-Erstellen neu (unverifiziert) entstehen.
+  Ticket-Erstellen neu (unverifiziert) entstehen; Support kann sie verifizieren.
+
+### 4.9 `Problem`
+Die abgespeckte Variante eines Tickets (Problemmeldung). Felder: `Id`, `Title`,
+`Description`, `Priority`, `Status`, `ContactEmail` (Pflicht – Rückmeldung),
+`CreatedByUserId?` (null bei anonymer Meldung), `CreatedAt`, `UpdatedAt`,
+`ClosedAt?`. Keine Abteilung/Subject/Anhänge. Erstellbar anonym und eingeloggt,
+bearbeitet nur von Admins.
+
+### 4.10 `TicketRead`
+Merkt sich pro `(TicketId, UserId)` den Zeitpunkt `LastReadAt` (zuletzt gesehen).
+Grundlage für die Benachrichtigung „neue Antwort erhalten": Existiert eine fremde
+Nachricht, die neuer ist als dieser Zeitpunkt, gilt sie als ungelesen.
 
 ---
 
@@ -241,11 +253,14 @@ Ungeprüftes durch.
 | `RegisterDto` | Self-Registrierung | Vorname/Nachname Pflicht+MaxLen, E-Mail Format, Passwort-Regex (≥8, Groß/Klein/Ziffer), **Abteilung Pflicht (muss existieren)**. |
 | `CreateUserDto` | Admin legt User an | Namen Pflicht+MaxLen, E-Mail Format, Passwort-Regex, Rolle, Abteilung optional (muss existieren). |
 | `UpdateUserDto` | Admin ändert User | Alle Felder optional (inkl. Abteilung); MaxLen/E-Mail/Enum-Prüfung; nur gesetzte werden übernommen. |
-| `UpdateProfileDto` | eigenes Profil | Alle Felder optional; MaxLen/E-Mail-Prüfung. |
+| `UpdateProfileDto` | eigenes Profil | Vor-/Nachname optional, **Abteilung** optional (nur User); **KEINE E-Mail** (nicht änderbar). |
+| `CreateProblemDto` | Problemmeldung | Titel (3–200), Beschreibung (≤2000), Priorität (Enum), Kontakt-E-Mail Pflicht+Format. |
+| `UpdateProblemStatusDto` | Problem-Status (Admin) | gültiger Enum-Status. |
 | `ChangePasswordDto` | Passwortwechsel | Altes PW Pflicht, neues PW Regex. |
 | `CreateTicketDto` | Ticket anlegen | Priorität (Enum), Titel/Beschreibung/Erwartet/Aktuell Pflicht+MaxLen, AGB+Billing müssen `true` sein, Abteilung muss existieren, Subject Pflicht (2–30 Zeichen), Zusatzkontakte müssen existieren. |
 | `UpdateTicketDto` | Ticket ändern | Optionale Felder; existierende Zusatzkontakte. |
 | `UpdateTicketStatusDto` | Statuswechsel | `Status` muss gültiger Enum-Wert sein. |
+| `ReopenTicketDto` | Wiedereröffnen | `Message` Pflicht, 1–4000 Zeichen. |
 | `AssignTicketDto` | Zuweisung | `AssignToEmail` optional; wenn gesetzt, muss User existieren; `null` = Zuweisung entfernen. |
 | `CreateDialogueDto` | Chat-Nachricht | `Text` Pflicht, 1–4000 Zeichen; `IsInternal` nur als Wunsch (serverseitig rollenabhängig erzwungen). |
 | `CreateTimeEntryDto` | Zeiteintrag | `Minutes` 1–1440, `Note` ≤500, `WorkedAt` Pflicht + nicht in der Zukunft. |
@@ -263,13 +278,17 @@ Controller, da `IFormFile` nicht über DataAnnotations validierbar ist.
 - `TicketResponseDto` – angereichertes Ticket: zusätzlich `StatusCode`,
   `PriorityCode`, `CreatedByEmail`, `AssignedToEmail`, `DepartmentName`,
   `SubjectName`, `ExpectedResult`, `ActualResult`, `TotalMinutes` (Summe der
-  erfassten Zeit). Versorgt Liste, Kanban und Detailseite.
+  erfassten Zeit) und `HasUnreadReply` (ungelesene fremde Antwort). Versorgt
+  Liste, Kanban und Detailseite.
+- `ProblemResponseDto` – Problemmeldung (inkl. Status-/Prioritäts-Codes,
+  Kontakt-E-Mail, `CreatedByUserId?`).
 - `DialogueResponseDto` – Chat-Nachricht inkl. Autor-E-Mail.
 - `TimeEntryResponseDto` – Zeiteintrag inkl. Bearbeiter-E-Mail.
 - `AttachmentResponseDto` – Anhang-Metadaten (ohne Inhalt) inkl. Hochlader-E-Mail.
 - `AgentStatsDto`, `CustomerStatsDto` (inkl. `DepartmentName`),
   `DepartmentStatsDto` – Statistik-Zeilen.
-- `DashboardDto` (+ `DashboardTicketDto`) – Dashboard-Kennzahlen + letzte Tickets.
+- `DashboardDto` (+ `DashboardTicketDto`) – Dashboard-Kennzahlen (inkl.
+  `UnreadReplyCount`) + letzte Tickets.
 - `KnowledgeArticleDto` – voller Artikel (Verwaltung); `KnowledgeSuggestionDto` –
   kompakter Vorschlag (Id, Titel, Lösung).
 - `DepartmentDto`, `SubjectDto` – Auswahllisten fürs Frontend.
@@ -288,9 +307,16 @@ geben. Die meisten Controller haben private Helfer `CurrentUserId` und `IsStaff`
 
 ### 7.0 `Program.cs` (Startup)
 Kein Controller, aber die zentrale Konfiguration:
-- CORS-Policy `AllowAll`; lädt `appsettings.Local.json`.
-- `EnsureJwtKeyExists` / `EnsureAttachmentKeyExists`: erzeugen beim ersten Start
-  kryptographisch sichere Schlüssel und speichern sie in `appsettings.Local.json`.
+- CORS-Policy `AllowAll`.
+- **Konfigurationsquelle je Umgebung:** In *Development* wird
+  `appsettings.Local.json` geladen und fehlende Schlüssel automatisch erzeugt.
+  In *Production* kommen alle Werte aus **Umgebungsvariablen**
+  (`ConnectionStrings__DefaultConnection`, `Jwt__Key`, `Attachments__Key`); fehlt
+  einer, startet die App bewusst nicht. Details:
+  `ANLEITUNG_UMGEBUNGSVARIABLEN.txt` im Projektordner.
+- `EnsureJwtKeyExists` / `EnsureAttachmentKeyExists`: erzeugen (nur in
+  Development) beim ersten Start kryptographisch sichere Schlüssel und speichern
+  sie in `appsettings.Local.json`.
 - Registriert DbContext (SQL Server), Controller, OpenAPI, JWT-Bearer-Auth und
   Autorisierung.
 - Middleware-Reihenfolge: HTTPS-Redirect, statische Dateien, CORS,
@@ -300,16 +326,17 @@ Kein Controller, aber die zentrale Konfiguration:
 - Beim Start: `DbInitializer.Initialize(...)`.
 
 ### 7.1 `AuthController` (`api/auth`)
-- `POST login` – prüft aktiven + freigeschalteten User + BCrypt-Passwort, gibt
-  JWT zurück.
+- `POST login` – prüft zuerst das Passwort (Schutz gegen Konto-Erkundung), dann
+  den Status: **deaktivierte/abgelehnte** Konten erhalten eine eigene Meldung
+  („abgelehnt oder deaktiviert"), noch nicht freigeschaltete ebenfalls; sonst JWT.
 - `POST register` – legt einen `User` (Rolle `User`, `IsActivated = false`) mit
   Namen **und Abteilung** an; Freischaltung erfolgt durch einen Admin.
 - `CreateToken` – baut das JWT mit Claims `NameIdentifier`, `Email`, `Role`.
 
 ### 7.2 `AccountController` (`api/account`, eingeloggt)
-- `GET me` – eigenes Profil.
-- `PUT me` – eigenes Profil teil-aktualisieren (leere Felder = unverändert,
-  E-Mail-Eindeutigkeit geprüft).
+- `GET me` – eigenes Profil (inkl. Abteilung).
+- `PUT me` – Vor-/Nachname und (nur bei Rolle User) **Abteilung** ändern.
+  Die **E-Mail ist nicht änderbar** und wird ignoriert.
 - `PUT me/password` – Passwort ändern (altes PW muss stimmen).
 
 ### 7.3 `UserController` (`api/user`)
@@ -328,16 +355,25 @@ Kein Controller, aber die zentrale Konfiguration:
   Zusatzkontakte auf, legt Ticket + erste `TicketTransaction` an. Admin/Support
   erhalten hier `403`.
 - `GET /` – Liste **mit Suche & Filter** (Query-Parameter `q`, `status`,
-  `priority`, `departmentId`, `assignedTo`=`me`/`none`). User sehen nur eigene,
-  Staff alle.
+  `activeOnly` (nur nicht-geschlossene, für die Startseite), `priority`,
+  `departmentId`, `assignedTo`=`me`/`none`, `createdFrom`/`createdTo`
+  (**Filter nach Erstellungsdatum**)). User sehen nur eigene, Staff alle.
 - `GET {id}` – Einzel-Ticket (Zugriffsschutz für fremde Tickets).
 - `PATCH {id}` – Felder ändern (Zuweisung nur Staff); schreibt eine Transaktion.
 - `PATCH {id}/status` – Kanban-Statuswechsel; pflegt `OpenedAt`/`ClosedAt` und
-  schreibt eine Transaktion.
+  schreibt eine Transaktion. **Schließen** ist kommentarlos. Ein
+  **Wiedereröffnen** (Closed → offen) wird hier bewusst abgelehnt – dafür gibt es
+  den Reopen-Endpunkt.
+- `POST {id}/reopen` – geschlossenes Ticket wiedereröffnen (Ersteller oder Staff).
+  Eine **Nachricht ist Pflicht** (`ReopenTicketDto`) und wird als Dialog-Eintrag
+  gespeichert; Status wird auf Open gesetzt.
 - `PATCH {id}/assign` (Admin/Support) – Bearbeiter zuweisen/entfernen.
+- `POST {id}/read` – Ticket als gelesen markieren (setzt `TicketRead`), wodurch
+  die „neue Antwort"-Kennzeichnung verschwindet.
+- **Nur Rolle User** darf erstellen (`POST /`, siehe oben).
 - **Private Helfer:** `ResolveUserIdOrNull`, `WriteTransaction`,
   `ProjectTickets` (LINQ-Projektion mit Left-Joins auf Department/Subject/
-  Ersteller/Bearbeiter + Summe der Zeiteinträge).
+  Ersteller/Bearbeiter + Summe der Zeiteinträge + `HasUnreadReply`).
 
 ### 7.5 `DialogueController` (`api/ticket/{ticketId}/dialogue`, eingeloggt)
 Chat-Funktion, gespeichert in `TicketDialogue`.
@@ -374,13 +410,31 @@ Datei-Anhänge.
 ### 7.9 `DashboardController` (`api/dashboard`, eingeloggt)
 - `GET` – rollenabhängige Kennzahlen: offen/in Bearbeitung/geschlossen/gesamt
   (Staff systemweit, User nur eigene); für Staff zusätzlich „mir zugewiesen
-  (offen)" und „nicht zugewiesen (offen)"; plus die 5 zuletzt erstellten Tickets.
+  (offen)" und „nicht zugewiesen (offen)"; `UnreadReplyCount` (ungelesene
+  Antworten); plus die 5 zuletzt erstellten Tickets.
 
 ### 7.10 `MetadataController` (`api/metadata`, eingeloggt)
 Auswahllisten fürs Frontend.
-- `GET departments` (**[AllowAnonymous]**, da auch auf der Registrierungsseite
-  ohne Login gebraucht) / `GET subjects` (optional pro Abteilung).
+- `GET departments` (**[AllowAnonymous]**, da auch auf Registrierungs-/Problem-
+  seite ohne Login gebraucht) / `GET subjects` (optional pro Abteilung, optional
+  `verifiedOnly` für das Ticket-Dropdown).
 - `GET agents` (Admin/Support) – Bearbeiterliste für die Zuweisung.
+
+### 7.12 `SubjectController` (`api/subject`, Admin/Support)
+Verwaltung der Themen (Subjects).
+- `GET /` – alle Themen (verifizierte/unverifizierte), unverifizierte oben.
+- `PATCH {id}/verify` / `PATCH {id}/unverify` – Verifizierung setzen/zurücknehmen.
+- `DELETE {id}` (Admin) – Thema löschen.
+Verifizierte Themen werden beim Ticket-Erstellen als Auswahl (datalist)
+angeboten (`MetadataController.Subjects?verifiedOnly=true`).
+
+### 7.13 `ProblemController` (`api/problem`)
+Problemmeldungen (abgespeckte Tickets).
+- `POST /` (**[AllowAnonymous]**) – anonym ODER eingeloggt erstellbar; ist ein
+  Token vorhanden, wird der Ersteller festgehalten. Kontakt-E-Mail Pflicht.
+- `GET /` (**Admin**) – Liste mit Suche/Filter (`q`, `status`, `priority`).
+- `GET {id}`, `PATCH {id}/status`, `DELETE {id}` (**Admin**) – ansehen,
+  Status ändern, löschen.
 
 ### 7.11 `KnowledgeController` (`api/knowledge`, eingeloggt)
 Wissensdatenbank / Lösungsvorschläge.
@@ -402,10 +456,12 @@ Wissensdatenbank / Lösungsvorschläge.
 - `getMich()` (gecacht) und `istStaff()`.
 - `seitenleisteAufbauen(aktiv)` – baut die linke Leiste: ganz oben der
   eigenständige Link **Startseite** (→ `dashboard.html`, **kein** Dropdown),
-  darunter **Dropdown-Gruppen**: *Tickets* (Meine Tickets; *Ticket erstellen* und
-  *Problem melden* nur für Rolle `User`), *Bearbeitung* (Staff: Kanban,
-  Wissensdatenbank), *Verwaltung* (Admin: Statistik, Benutzer), *Konto* (Profil).
-  Die Gruppe mit dem aktiven Punkt ist geöffnet; `navToggle()` klappt um.
+  darunter **Dropdown-Gruppen**: *Tickets* (Offene Tickets, Verlauf; *Ticket
+  erstellen* nur für Rolle `User`; *Problem melden* für alle), *Bearbeitung*
+  (Staff: Kanban,
+  Wissensdatenbank, Themen), *Verwaltung* (Admin: Statistik, Benutzer,
+  Problemmeldungen), *Konto* (Profil). Die Gruppe mit dem aktiven Punkt ist
+  geöffnet; `navToggle()` klappt um.
 - Helfer: `esc()` (HTML-Escaping), `minutenFormat()` sowie Status-/Prioritäts-
   Tabellen (Text/Farbe) passend zu den Enums.
 
@@ -418,18 +474,21 @@ Formulare.
 
 | Datei | Zugang | Zweck |
 |-------|--------|-------|
-| `index.html` | öffentlich | Login (setzt Token, bindet `app.js` nicht ein). Link zur Registrierung. |
-| `register.html` | öffentlich | Selbst-Registrierung (Name, E-Mail, **Abteilung**, Passwort). |
-| `dashboard.html` | alle | „Startseite": Kennzahlen-Kacheln + zuletzt erstellte Tickets. |
-| `startseite.html` | alle | „Meine Tickets": Ticketliste mit Such-/Filterleiste; Kunde sieht eigene, Staff alle. |
-| `TicketErstellen.html` | nur User | 5-Schritt-Assistent; Kontaktdaten autom. & gesperrt, Abteilung als Dropdown, **Live-Lösungsvorschläge** beim Titel. |
-| `problemMelden.html` | nur User | Schnelles Kontakt-/Ticketformular. |
-| `ticket.html` | alle | Ticket-Detail: Beschreibung, **Chat** (interne Notizen für Staff), **Anhänge**; für Staff zusätzlich Status, Zuweisung, **Zeiterfassung**. |
-| `kanban.html` | Staff | 3-Spalten-Board mit **Drag & Drop** und „Öffnen"-Link. |
-| `statistik.html` | Admin | Bearbeiter- und Kundenauswertung (Tabellen + Balken). |
-| `benutzer.html` | Admin | Benutzer verwalten (Rolle, **Abteilung**, sperren) + Registrierungen freischalten/ablehnen. |
-| `wissen.html` | Staff | Wissensartikel anlegen/bearbeiten/löschen. |
-| `profil.html` | alle | Eigenes Profil + Passwort ändern. |
+| `index.html` | öffentlich | Login (Hintergrund + Logo-Slot `logo.png`; Links zu Registrierung und „Problem melden ohne Login"). |
+| `register.html` | öffentlich | Selbst-Registrierung (Name, E-Mail, **Abteilung**, Passwort; Hintergrund + Logo). |
+| `dashboard.html` | alle | „Startseite": Kennzahlen-Kacheln (inkl. **Neue Antworten**) + zuletzt erstellte Tickets. |
+| `startseite.html` | alle | „Offene Tickets": **nur nicht-geschlossene** Tickets, Suche/Filter (ohne Statusfilter), Kennzeichnung **„Neue Antwort"**. |
+| `verlauf.html` | alle | „Verlauf": **geschlossene** Tickets; Öffnen führt zum Wiedereröffnen. |
+| `TicketErstellen.html` | nur User | 5-Schritt-Assistent; Kontaktdaten autom. & gesperrt, Abteilung als Dropdown, **verifizierte Themen** als Auswahl, **Live-Lösungsvorschläge** beim Titel. |
+| `problemMelden.html` | öffentlich + eingeloggt | Standalone-Problemformular (Titel, Beschreibung, Prio, Kontakt-E-Mail; eingeloggt vorbefüllt). |
+| `probleme.html` | Admin | Problemmeldungen ansehen/Status ändern/löschen, mit Suche/Filter. |
+| `themen.html` | Staff | Themen (Subjects) verifizieren/löschen, mit Suche/Filter. |
+| `ticket.html` | alle | Ticket-Detail: Beschreibung, **Chat**, **Anhänge**; für Staff Status/Zuweisung/**Zeiterfassung**; **Wiedereröffnen mit Pflicht-Nachricht** bei geschlossenen Tickets; markiert als gelesen. |
+| `kanban.html` | Staff | 3-Spalten-Board mit **Drag & Drop**; Zeitraum-Modus **Gesamt / letzte 60 / letzte 30 Tage** (nach **letztem Update**). |
+| `statistik.html` | Admin | **Diagramme (Chart.js)** + Tabellen: Abteilung/Bearbeiter/Kunden/Status. |
+| `benutzer.html` | Admin | Benutzer verwalten (Rolle, **Abteilung**, sperren, Suche/Filter) + Registrierungen freischalten/ablehnen. |
+| `wissen.html` | Staff | Wissensartikel anlegen/bearbeiten/löschen (mit Suche). |
+| `profil.html` | alle | Eigenes Profil (E-Mail readonly, Abteilung nur User) + Passwort. |
 
 ---
 
@@ -494,6 +553,44 @@ einfache HTML-Seiten) in drei Ausbaustufen erweitert.
 - Suche/Filter in `TicketController.GetAll` + Filterleiste in `startseite.html`.
 - `KnowledgeArticle` + `KnowledgeController` (Stichwortsuche), `wissen.html`,
   Live-Vorschläge beim Ticket-Titel, Seed-Artikel im `DbInitializer`.
+
+### Ausbau 7 – Wiedereröffnen & Verlauf
+- **Wiedereröffnen** geschlossener Tickets über `POST /api/ticket/{id}/reopen`
+  mit **Pflicht-Nachricht** (als Dialog-Eintrag). Ersteller und Staff dürfen das.
+  Der Status-Endpunkt lehnt ein Wiedereröffnen ohne Nachricht ab; Kanban und
+  Ticket-Detail führen den Vorgang mit Nachricht durch.
+- **Schließen** bleibt kommentarlos (nur Statuswechsel).
+- **Verlauf** (`verlauf.html`): eigener Reiter für geschlossene Tickets.
+- **Startseite** zeigt nur noch **offene** Tickets (`activeOnly`); der Statusfilter
+  dort ist entfallen.
+- **Kanban-Zeitraum-Modus:** Umschalter *Gesamt / letzte 60 Tage / letzte 30 Tage*
+  (Filter nach **letztem Update**, clientseitig).
+- **Filter nach Erstellungsdatum** (`createdFrom`/`createdTo`) in den Ticketlisten
+  (Startseite „Offene Tickets" und „Verlauf") über Datumsfelder „Erstellt von/bis".
+
+### Ausbau 6 – Feinschliff, Problemmeldungen, Benachrichtigungen
+- **Login:** Hintergrund + Logo-Slot (`wwwroot/logo.png`); abgelehnte/deaktivierte
+  Konten erhalten eine klare Meldung.
+- **Ticket erstellen:** Tab-Beschriftung lesbar (Farb-Bug), Datei-Löschen
+  repariert, fehlende Bestätigungen gesammelt angezeigt, **Thema als Auswahl
+  verifizierter Subjects** (datalist) + Freitext.
+- **Themen (Subjects):** `SubjectController` + `themen.html` – Support verifiziert
+  Themen; verifizierte werden beim Ticket-Erstellen vorgeschlagen.
+- **Profil:** E-Mail nicht mehr änderbar; Abteilung im Profil (nur User).
+- **Rollen/Abteilung:** Admin/Support haben keine Abteilung (Backend erzwingt es).
+- **Konfiguration:** Development = `appsettings.Local.json`, Production =
+  Umgebungsvariablen (`ANLEITUNG_UMGEBUNGSVARIABLEN.txt`).
+- **Problemmeldungen:** eigene Entität `Problem` + `ProblemController`
+  (anonym und eingeloggt erstellbar, Kontakt-E-Mail Pflicht, nur Admin
+  bearbeitet), `problemMelden.html` (standalone/öffentlich) + `probleme.html`
+  (Admin).
+- **Statistik:** Diagramme mit Chart.js (Abteilung/Bearbeiter/Status).
+- **Benachrichtigung:** `TicketRead`-Tracking; ungelesene Antworten werden auf
+  Dashboard und Ticketliste gekennzeichnet (`POST /api/ticket/{id}/read`).
+  Mail-Versand ist bewusst noch nicht angebunden (SMTP später), die
+  Benachrichtigung ist aber als Andockpunkt vorbereitet.
+- **Suche/Filter:** zusätzlich in Benutzer-, Wissens-, Themen- und
+  Problem-Listen.
 
 ### Ausbau 5 – Abteilungszugehörigkeit & Abteilungs-Statistik
 - Jeder User gehört einer **Abteilung** an; diese wird bei der Registrierung

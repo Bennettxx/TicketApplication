@@ -113,7 +113,11 @@ namespace TicketApplication.Controllers
                 return BadRequest("Diese Email-Adresse wird bereits verwendet.");
 
             // Abteilung auflösen (Existenz im DTO geprüft).
-            int? departmentId = await ResolveDepartmentId(dto.DepartmentName);
+            // WICHTIG: Nur die Rolle User bekommt eine Abteilung;
+            // Admin/Support haben grundsätzlich keine.
+            int? departmentId = dto.Role == UserRole.User
+                ? await ResolveDepartmentId(dto.DepartmentName)
+                : null;
 
             // Wir bauen den User selbst zusammen — der Caller hat keine Kontrolle über Id, IsActive etc.
             var user = new User
@@ -179,8 +183,19 @@ namespace TicketApplication.Controllers
                 user.Email = dto.Email;
             }
             if (dto.Role.HasValue) user.Role = dto.Role.Value;
-            if (dto.DepartmentName != null)
-                user.DepartmentId = await ResolveDepartmentId(dto.DepartmentName);
+
+            // Abteilung nur für Rolle User; Admin/Support haben keine.
+            // Bei Rollenwechsel zu Staff wird eine bestehende Abteilung entfernt.
+            if (user.Role == UserRole.User)
+            {
+                if (dto.DepartmentName != null)
+                    user.DepartmentId = await ResolveDepartmentId(dto.DepartmentName);
+            }
+            else
+            {
+                user.DepartmentId = null;
+            }
+
             if (dto.IsActivated.HasValue) user.IsActivated = dto.IsActivated.Value;
             if (dto.IsActive.HasValue) user.IsActive = dto.IsActive.Value;
             // user.PasswordHash bleibt unberührt!

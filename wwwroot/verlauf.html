@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Verlauf</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+
+    <div class="main">
+        <span class="benutzer" id="benutzername">...</span>
+        <h1>Verlauf</h1>
+        <p style="color:#555">Geschlossene Tickets. Öffne ein Ticket, um es (mit Nachricht) wiederzueröffnen.</p>
+
+        <!-- Such-/Filterleiste -->
+        <div class="karte" style="margin-bottom:16px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                <div style="flex:2; min-width:200px;">
+                    <label style="margin-top:0;">Suche (Titel/Beschreibung)</label>
+                    <input type="text" id="fSuche" placeholder="Suchbegriff..." oninput="filterDebounce()">
+                </div>
+                <div style="flex:1; min-width:120px;">
+                    <label style="margin-top:0;">Priorität</label>
+                    <select id="fPrio" onchange="laden()">
+                        <option value="">Alle</option>
+                        <option value="0">Low</option>
+                        <option value="1">Medium</option>
+                        <option value="2">High</option>
+                    </select>
+                </div>
+                <div style="flex:1; min-width:140px;">
+                    <label style="margin-top:0;">Erstellt von</label>
+                    <input type="date" id="fVon" onchange="laden()">
+                </div>
+                <div style="flex:1; min-width:140px;">
+                    <label style="margin-top:0;">Erstellt bis</label>
+                    <input type="date" id="fBis" onchange="laden()">
+                </div>
+            </div>
+        </div>
+
+        <div id="bereich" class="karte">Lädt...</div>
+    </div>
+
+    <script src="/app.js"></script>
+    <script>
+        let IST_STAFF = false;
+        let filterTimer = null;
+
+        (async function () {
+            await seitenleisteAufbauen('verlauf');
+            IST_STAFF = istStaff(await getMich());
+            await laden();
+        })();
+
+        function filterDebounce() { clearTimeout(filterTimer); filterTimer = setTimeout(laden, 350); }
+
+        async function laden() {
+            const p = new URLSearchParams();
+            p.set('status', '2'); // nur geschlossene
+            const q = document.getElementById('fSuche').value.trim();
+            const prio = document.getElementById('fPrio').value;
+            const von = document.getElementById('fVon').value;
+            const bis = document.getElementById('fBis').value;
+            if (q) p.set('q', q);
+            if (prio !== '') p.set('priority', prio);
+            if (von) p.set('createdFrom', von);
+            if (bis) p.set('createdTo', bis);
+
+            const bereich = document.getElementById('bereich');
+            try {
+                const tickets = await api('/api/ticket?' + p.toString());
+                if (!tickets.length) { bereich.innerHTML = '<p>Keine geschlossenen Tickets.</p>'; return; }
+                bereich.innerHTML = `
+                    <table>
+                        <thead><tr>
+                            <th>Nr</th><th>Titel</th><th>Priorität</th><th>Abteilung</th>
+                            ${IST_STAFF ? '<th>Ersteller</th>' : ''}
+                            <th>Geschlossen am</th>
+                        </tr></thead>
+                        <tbody>${tickets.map(t => `
+                            <tr style="cursor:pointer" onclick="location.href='/ticket.html?id=${t.id}'">
+                                <td>#${t.id}</td>
+                                <td>${esc(t.title)}</td>
+                                <td><span class="badge" style="background:${PRIO_FARBE[t.priorityCode]}">${PRIO_TEXT[t.priorityCode]}</span></td>
+                                <td>${esc(t.departmentName)}</td>
+                                ${IST_STAFF ? `<td>${esc(t.createdByEmail)}</td>` : ''}
+                                <td>${t.closedAt ? new Date(t.closedAt).toLocaleDateString('de-DE') : '—'}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+            } catch (e) {
+                bereich.innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
