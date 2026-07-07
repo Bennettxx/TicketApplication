@@ -43,8 +43,8 @@ namespace TicketApplication.Data
                 context.Users.AddRange(
                     new User
                     {
-                        FirstName = "Admin",
-                        SecondName = "User",
+                        FirstName = "A_Vorname",
+                        SecondName = "A_Nachname",
                         Email = "admin@user.com",
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
                         Role = UserRole.Admin,
@@ -54,8 +54,8 @@ namespace TicketApplication.Data
                     },
                     new User
                     {
-                        FirstName = "Support",
-                        SecondName = "User",
+                        FirstName = "S_Vorname",
+                        SecondName = "S_Nachname",
                         Email = "support@user.com",
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
                         Role = UserRole.Support,
@@ -65,8 +65,8 @@ namespace TicketApplication.Data
                     },
                     new User
                     {
-                        FirstName = "User",
-                        SecondName = "User",
+                        FirstName = "U_Vorname",
+                        SecondName = "U_Nachname",
                         Email = "user@user.com",
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
                         Role = UserRole.User,
