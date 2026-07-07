@@ -152,33 +152,43 @@ namespace TicketApplication.Controllers
                 t => t.Id,
                 t => userDept.TryGetValue(t.CreatedByUserId, out var dep) ? dep : (int?)null);
 
-            // Aggregation je Abteilung (null = ohne Abteilung)
-            var stats = new Dictionary<int?, DepartmentStatsDto>();
+            // Aggregation je Abteilung.
+            // WICHTIG: Ein Dictionary erlaubt KEINEN null-Schlüssel (auch nicht
+            // bei Schlüsseltyp int?). Deshalb wird "ohne Abteilung" (z.B.
+            // Admin/Support ohne Abteilung) in einem SEPARATEN Bucket gehalten,
+            // und das Dictionary verwendet nur echte (nicht-null) Abteilungs-Ids.
+            var stats = new Dictionary<int, DepartmentStatsDto>();
+            var ohneAbteilung = new DepartmentStatsDto
+            {
+                DepartmentId = null,
+                DepartmentName = "(ohne Abteilung)"
+            };
+
             DepartmentStatsDto Bucket(int? depId)
             {
-                if (!stats.TryGetValue(depId, out var s))
+                if (depId == null) return ohneAbteilung;
+
+                if (!stats.TryGetValue(depId.Value, out var s))
                 {
                     s = new DepartmentStatsDto
                     {
-                        DepartmentId = depId,
-                        DepartmentName = depId == null
-                            ? "(ohne Abteilung)"
-                            : departments.FirstOrDefault(d => d.Id == depId)?.Name ?? $"#{depId}"
+                        DepartmentId = depId.Value,
+                        DepartmentName = departments.FirstOrDefault(d => d.Id == depId.Value)?.Name
+                                         ?? $"#{depId.Value}"
                     };
-                    stats[depId] = s;
+                    stats[depId.Value] = s;
                 }
                 return s;
             }
 
-            // Alle Abteilungen vorab anlegen (auch ohne Tickets).
+            // Alle Abteilungen vorab anlegen (auch ohne Tickets/User).
             foreach (var d in departments) Bucket(d.Id);
 
             foreach (var u in users) Bucket(u.DepartmentId).UserCount++;
 
             foreach (var t in tickets)
             {
-                var dep = ticketDept[t.Id];
-                var b = Bucket(dep);
+                var b = Bucket(ticketDept[t.Id]);
                 b.TicketCount++;
                 if (t.Status != TicketStatus.Closed) b.OpenTicketCount++;
             }
@@ -189,7 +199,12 @@ namespace TicketApplication.Controllers
                 Bucket(dep).TotalMinutes += e.Minutes;
             }
 
-            var result = stats.Values
+            // Ergebnis: echte Abteilungen + ("ohne Abteilung" nur wenn dort etwas anfällt).
+            var result = stats.Values.ToList();
+            if (ohneAbteilung.UserCount > 0 || ohneAbteilung.TicketCount > 0 || ohneAbteilung.TotalMinutes > 0)
+                result.Add(ohneAbteilung);
+
+            result = result
                 .OrderByDescending(s => s.TotalMinutes)
                 .ThenByDescending(s => s.TicketCount)
                 .ToList();
