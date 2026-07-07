@@ -9,5 +9,9 @@
         public string Email { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
         public bool IsActivated { get; set; }
+
+        // Abteilungszugehörigkeit des Benutzers.
+        public int? DepartmentId { get; set; }
+        public string? DepartmentName { get; set; }
     }
 }

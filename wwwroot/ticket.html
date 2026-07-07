@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Ticket-Detail</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .grid { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+        .spalte-links { flex: 2; min-width: 340px; }
+        .spalte-rechts { flex: 1; min-width: 280px; }
+
+        .chat {
+            max-height: 420px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px 0;
+        }
+        .nachricht {
+            padding: 10px 14px;
+            border-radius: 12px;
+            max-width: 85%;
+        }
+        .nachricht .meta { font-size: 11px; color: #777; margin-bottom: 4px; }
+        .nachricht .text { white-space: pre-wrap; }
+        .von-mir   { background: #d1f0e0; align-self: flex-end; }
+        .von-andern{ background: #eef1f4; align-self: flex-start; }
+        .intern    { background: #fff3cd; border: 1px dashed #e0a800; align-self: flex-start; }
+        .intern .meta::after { content: ' · interne Notiz'; color: #e0a800; font-weight: bold; }
+
+        .info-zeile { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; }
+        .info-zeile b { color: #2c3e50; }
+        .zeit-eintrag { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 13px; }
+        .mini { font-size: 12px; color: #777; }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+
+    <div class="main">
+        <span class="benutzer" id="benutzername">...</span>
+
+        <a href="/startseite.html" class="mini">← Zurück zur Übersicht</a>
+        <h1 id="titel">Ticket</h1>
+
+        <div class="grid">
+            <!-- LINKS: Beschreibung + Chat -->
+            <div class="spalte-links">
+                <div class="karte" id="beschreibung" style="margin-bottom:20px;">Lädt...</div>
+
+                <div class="karte">
+                    <h3 style="margin-top:0">Dialog</h3>
+                    <div class="chat" id="chat"></div>
+
+                    <div id="chatEingabe" style="margin-top:10px;">
+                        <textarea id="chatText" rows="3" placeholder="Nachricht schreiben..."></textarea>
+                        <div id="internOption" style="display:none; margin-top:6px;">
+                            <label style="display:inline; font-weight:normal;">
+                                <input type="checkbox" id="chatIntern" style="width:auto;"> Als interne Notiz (nur Support/Admin)
+                            </label>
+                        </div>
+                        <button class="btn-gruen" style="margin-top:8px;" onclick="nachrichtSenden()">Senden</button>
+                        <span id="chatFeedback" class="mini"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RECHTS: Status/Zuweisung/Zeit (Zeit + Steuerung nur Staff) -->
+            <div class="spalte-rechts">
+                <div class="karte" id="infoKarte" style="margin-bottom:20px;">Lädt...</div>
+
+                <!-- Wiedereröffnen (nur wenn geschlossen) -->
+                <div class="karte" id="reopenKarte" style="display:none; margin-bottom:20px; border-left:4px solid #dc3545;">
+                    <h3 style="margin-top:0">Ticket wiedereröffnen</h3>
+                    <p class="mini">Dieses Ticket ist geschlossen. Zum Wiedereröffnen ist eine Nachricht erforderlich.</p>
+                    <textarea id="reopenText" rows="3" placeholder="Warum soll das Ticket wieder geöffnet werden?"></textarea>
+                    <button class="btn-gruen" style="margin-top:8px;" onclick="wiedereroeffnen()">Wiedereröffnen</button>
+                    <span id="reopenFeedback" class="mini"></span>
+                </div>
+
+                <!-- Anhänge (für alle, die das Ticket sehen dürfen) -->
+                <div class="karte" id="anhangKarte" style="margin-bottom:20px;">
+                    <h3 style="margin-top:0">Anhänge</h3>
+                    <div id="anhangListe"><p class="mini">Lädt...</p></div>
+
+                    <label>Datei hochladen (max. 5 MB)</label>
+                    <input type="file" id="anhangDatei">
+                    <label style="font-weight:normal; margin-top:8px;">
+                        <input type="checkbox" id="anhangPrivat" style="width:auto;">
+                        Private Daten (verschlüsselt speichern)
+                    </label>
+                    <button class="btn-gruen" style="margin-top:10px;" onclick="anhangHochladen()">Hochladen</button>
+                    <span id="anhangFeedback" class="mini"></span>
+                </div>
+
+                <!-- Staff-Steuerung -->
+                <div class="karte" id="staffKarte" style="display:none; margin-bottom:20px;">
+                    <h3 style="margin-top:0">Bearbeitung</h3>
+
+                    <label>Status</label>
+                    <select id="statusSelect" onchange="statusAendern()">
+                        <option value="0">Offen</option>
+                        <option value="1">In Bearbeitung</option>
+                        <option value="2">Geschlossen</option>
+                    </select>
+
+                    <label>Bearbeiter zuweisen</label>
+                    <select id="assignSelect" onchange="zuweisen()">
+                        <option value="">— nicht zugewiesen —</option>
+                    </select>
+                    <span id="staffFeedback" class="mini"></span>
+                </div>
+
+                <!-- Zeiterfassung (nur Staff) -->
+                <div class="karte" id="zeitKarte" style="display:none;">
+                    <h3 style="margin-top:0">Zeiterfassung</h3>
+                    <p class="mini">Gesamt: <b id="zeitGesamt">0m</b></p>
+                    <div id="zeitListe"></div>
+
+                    <label>Minuten</label>
+                    <input type="number" id="zeitMinuten" min="1" max="1440" placeholder="z.B. 30">
+                    <label>Datum</label>
+                    <input type="date" id="zeitDatum">
+                    <label>Notiz (optional)</label>
+                    <input type="text" id="zeitNotiz" maxlength="500" placeholder="Was wurde gemacht?">
+                    <button class="btn-gruen" style="margin-top:10px;" onclick="zeitErfassen()">Zeit erfassen</button>
+                    <span id="zeitFeedback" class="mini"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+    <script>
+        const ticketId = new URLSearchParams(window.location.search).get('id');
+        // MICH ist global in app.js deklariert und wird von getMich() gefüllt.
+
+        (async function () {
+            await seitenleisteAufbauen('tickets');
+            MICH = await getMich();
+
+            if (!ticketId) {
+                document.querySelector('.main').innerHTML = '<p class="feedback-rot">Kein Ticket angegeben.</p>';
+                return;
+            }
+
+            if (istStaff(MICH)) {
+                document.getElementById('internOption').style.display = 'block';
+                document.getElementById('staffKarte').style.display = 'block';
+                document.getElementById('zeitKarte').style.display = 'block';
+                document.getElementById('zeitDatum').value = new Date().toISOString().slice(0, 10);
+                await bearbeiterLaden();
+                await zeitLaden();
+            }
+
+            await ticketLaden();
+            await chatLaden();
+            await anhangLaden();
+
+            // Als gelesen markieren -> Benachrichtigung verschwindet.
+            try { await api(`/api/ticket/${ticketId}/read`, { method: 'POST' }); } catch { }
+        })();
+
+        async function ticketLaden() {
+            try {
+                const t = await api(`/api/ticket/${ticketId}`);
+                document.getElementById('titel').innerText = `#${t.id} – ${t.title}`;
+
+                document.getElementById('beschreibung').innerHTML = `
+                    <h3 style="margin-top:0">Beschreibung</h3>
+                    <p style="white-space:pre-wrap">${esc(t.description)}</p>
+                    <h4>Erwartetes Ergebnis</h4>
+                    <p style="white-space:pre-wrap">${esc(t.expectedResult) || '—'}</p>
+                    <h4>Aktuelles Ergebnis</h4>
+                    <p style="white-space:pre-wrap">${esc(t.actualResult) || '—'}</p>`;
+
+                document.getElementById('infoKarte').innerHTML = `
+                    <h3 style="margin-top:0">Info</h3>
+                    <div class="info-zeile"><span>Status</span><span class="badge" style="background:${STATUS_FARBE[t.statusCode]}">${STATUS_TEXT[t.statusCode]}</span></div>
+                    <div class="info-zeile"><span>Priorität</span><span class="badge" style="background:${PRIO_FARBE[t.priorityCode]}">${PRIO_TEXT[t.priorityCode]}</span></div>
+                    <div class="info-zeile"><span>Abteilung</span><b>${esc(t.departmentName)}</b></div>
+                    <div class="info-zeile"><span>Thema</span><b>${esc(t.subjectName)}</b></div>
+                    <div class="info-zeile"><span>Ersteller</span><b>${esc(t.createdByEmail)}</b></div>
+                    <div class="info-zeile"><span>Bearbeiter</span><b>${esc(t.assignedToEmail || '—')}</b></div>
+                    <div class="info-zeile"><span>Erfasste Zeit</span><b>${minutenFormat(t.totalMinutes)}</b></div>
+                    <div class="info-zeile"><span>Erstellt</span><b>${new Date(t.createdAt).toLocaleString('de-DE')}</b></div>`;
+
+                if (istStaff(MICH)) {
+                    document.getElementById('statusSelect').value = t.statusCode;
+                    document.getElementById('assignSelect').value = t.assignedToEmail || '';
+                    // Geschlossen: Status-Auswahl sperren -> Wiedereröffnen nur über Nachricht.
+                    document.getElementById('statusSelect').disabled = (t.statusCode === 2);
+                }
+
+                // Wiedereröffnen-Karte nur bei geschlossenem Ticket zeigen (Ersteller + Staff).
+                document.getElementById('reopenKarte').style.display =
+                    (t.statusCode === 2) ? 'block' : 'none';
+            } catch (e) {
+                document.getElementById('beschreibung').innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+
+        // ---- Chat ----
+        async function chatLaden() {
+            const chat = document.getElementById('chat');
+            try {
+                const nachrichten = await api(`/api/ticket/${ticketId}/dialogue`);
+                if (!nachrichten.length) {
+                    chat.innerHTML = '<p class="mini">Noch keine Nachrichten.</p>';
+                    return;
+                }
+                chat.innerHTML = nachrichten.map(n => {
+                    let klasse = n.isInternal ? 'intern'
+                        : (n.authorUserId === MICH.id ? 'von-mir' : 'von-andern');
+                    return `<div class="nachricht ${klasse}">
+                        <div class="meta">${esc(n.authorEmail)} · ${new Date(n.createdAt).toLocaleString('de-DE')}</div>
+                        <div class="text">${esc(n.text)}</div>
+                    </div>`;
+                }).join('');
+                chat.scrollTop = chat.scrollHeight;
+            } catch (e) {
+                chat.innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+
+        async function nachrichtSenden() {
+            const fb = document.getElementById('chatFeedback');
+            const text = document.getElementById('chatText').value.trim();
+            const intern = document.getElementById('chatIntern')?.checked || false;
+            if (!text) { fb.textContent = 'Bitte Text eingeben.'; return; }
+            try {
+                await api(`/api/ticket/${ticketId}/dialogue`, {
+                    method: 'POST',
+                    body: JSON.stringify({ text: text, isInternal: intern })
+                });
+                document.getElementById('chatText').value = '';
+                if (document.getElementById('chatIntern')) document.getElementById('chatIntern').checked = false;
+                fb.textContent = '';
+                await chatLaden();
+            } catch (e) { fb.textContent = e.message; }
+        }
+
+        // ---- Status / Zuweisung (Staff) ----
+        async function statusAendern() {
+            const fb = document.getElementById('staffFeedback');
+            const status = parseInt(document.getElementById('statusSelect').value);
+            try {
+                await api(`/api/ticket/${ticketId}/status`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ ticketId: parseInt(ticketId), status: status })
+                });
+                fb.textContent = 'Status gespeichert.';
+                await ticketLaden();
+            } catch (e) { fb.textContent = e.message; }
+        }
+
+        // Wiedereröffnen mit Pflicht-Nachricht.
+        async function wiedereroeffnen() {
+            const fb = document.getElementById('reopenFeedback');
+            const text = document.getElementById('reopenText').value.trim();
+            if (!text) { fb.textContent = 'Bitte eine Nachricht angeben.'; return; }
+            try {
+                await api(`/api/ticket/${ticketId}/reopen`, {
+                    method: 'POST',
+                    body: JSON.stringify({ message: text })
+                });
+                document.getElementById('reopenText').value = '';
+                fb.textContent = '';
+                await ticketLaden();
+                await chatLaden();
+            } catch (e) { fb.textContent = e.message; }
+        }
+
+        async function bearbeiterLaden() {
+            try {
+                const agents = await api('/api/metadata/agents');
+                const sel = document.getElementById('assignSelect');
+                agents.forEach(a => {
+                    const o = document.createElement('option');
+                    o.value = a.email; o.textContent = a.email;
+                    sel.appendChild(o);
+                });
+            } catch { /* ignore */ }
+        }
+
+        async function zuweisen() {
+            const fb = document.getElementById('staffFeedback');
+            const email = document.getElementById('assignSelect').value;
+            try {
+                await api(`/api/ticket/${ticketId}/assign`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ assignToEmail: email || null })
+                });
+                fb.textContent = 'Zuweisung gespeichert.';
+                await ticketLaden();
+            } catch (e) { fb.textContent = e.message; }
+        }
+
+        // ---- Zeiterfassung (Staff) ----
+        async function zeitLaden() {
+            try {
+                const eintraege = await api(`/api/ticket/${ticketId}/time`);
+                const liste = document.getElementById('zeitListe');
+                let gesamt = 0;
+                liste.innerHTML = eintraege.map(e => {
+                    gesamt += e.minutes;
+                    return `<div class="zeit-eintrag">
+                        <span>${minutenFormat(e.minutes)} · ${esc(e.userEmail)}<br>
+                              <span class="mini">${new Date(e.workedAt).toLocaleDateString('de-DE')}${e.note ? ' · ' + esc(e.note) : ''}</span></span>
+                        <button class="btn-rot" style="padding:2px 8px;" onclick="zeitLoeschen(${e.id})">✕</button>
+                    </div>`;
+                }).join('') || '<p class="mini">Noch keine Einträge.</p>';
+                document.getElementById('zeitGesamt').textContent = minutenFormat(gesamt);
+            } catch (e) { /* ignore */ }
+        }
+
+        async function zeitErfassen() {
+            const fb = document.getElementById('zeitFeedback');
+            const minutes = parseInt(document.getElementById('zeitMinuten').value);
+            const datum = document.getElementById('zeitDatum').value;
+            const notiz = document.getElementById('zeitNotiz').value;
+            if (!minutes || !datum) { fb.textContent = 'Minuten und Datum erforderlich.'; return; }
+            try {
+                await api(`/api/ticket/${ticketId}/time`, {
+                    method: 'POST',
+                    body: JSON.stringify({ minutes: minutes, workedAt: datum, note: notiz })
+                });
+                document.getElementById('zeitMinuten').value = '';
+                document.getElementById('zeitNotiz').value = '';
+                fb.textContent = '';
+                await zeitLaden();
+                await ticketLaden();
+            } catch (e) { fb.textContent = e.message; }
+        }
+
+        async function zeitLoeschen(id) {
+            try {
+                await api(`/api/ticket/${ticketId}/time/${id}`, { method: 'DELETE' });
+                await zeitLaden();
+                await ticketLaden();
+            } catch (e) { alert(e.message); }
+        }
+
+        // ---- Anhänge ----
+        function groesse(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+        }
+
+        async function anhangLaden() {
+            const liste = document.getElementById('anhangListe');
+            try {
+                const anhaenge = await api(`/api/ticket/${ticketId}/attachments`);
+                if (!anhaenge.length) {
+                    liste.innerHTML = '<p class="mini">Keine Anhänge.</p>';
+                    return;
+                }
+                liste.innerHTML = anhaenge.map(a => `
+                    <div class="info-zeile">
+                        <span>
+                            <a href="#" onclick="anhangDownload(${a.id}, '${esc(a.dataName)}'); return false;">${esc(a.dataName)}</a>
+                            ${a.containsPrivateData ? '<span class="badge" style="background:#e0a800; margin-left:4px;">privat</span>' : ''}
+                            <br><span class="mini">${groesse(a.fileSize)} · ${esc(a.uploadedByEmail)}</span>
+                        </span>
+                        <button class="btn-rot" style="padding:2px 8px;" onclick="anhangLoeschen(${a.id})">✕</button>
+                    </div>`).join('');
+            } catch (e) {
+                liste.innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+
+        async function anhangHochladen() {
+            const fb = document.getElementById('anhangFeedback');
+            const input = document.getElementById('anhangDatei');
+            const datei = input.files[0];
+            if (!datei) { fb.textContent = 'Bitte eine Datei wählen.'; return; }
+            if (datei.size > 5 * 1024 * 1024) { fb.textContent = 'Datei zu groß (max. 5 MB).'; return; }
+
+            const form = new FormData();
+            form.append('file', datei);
+            form.append('isPrivate', document.getElementById('anhangPrivat').checked);
+
+            fb.textContent = 'Lädt hoch...';
+            try {
+                // Eigener fetch, da Multipart (nicht der JSON-Wrapper).
+                const res = await fetch(`/api/ticket/${ticketId}/attachments`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${TOKEN}` },
+                    body: form
+                });
+                if (!res.ok) {
+                    let msg = 'Upload fehlgeschlagen.';
+                    try { const b = await res.json(); msg = (typeof b === 'string') ? b : (b.title || msg); } catch {}
+                    fb.textContent = msg;
+                    return;
+                }
+                input.value = '';
+                document.getElementById('anhangPrivat').checked = false;
+                fb.textContent = '';
+                await anhangLaden();
+            } catch (e) { fb.textContent = 'Server nicht erreichbar.'; }
+        }
+
+        async function anhangDownload(id, name) {
+            try {
+                const res = await fetch(`/api/ticket/${ticketId}/attachments/${id}/download`, {
+                    headers: { 'Authorization': `Bearer ${TOKEN}` }
+                });
+                if (!res.ok) { alert('Download fehlgeschlagen.'); return; }
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = name;
+                document.body.appendChild(a); a.click(); a.remove();
+                URL.revokeObjectURL(url);
+            } catch (e) { alert('Server nicht erreichbar.'); }
+        }
+
+        async function anhangLoeschen(id) {
+            if (!confirm('Anhang wirklich löschen?')) return;
+            try {
+                await api(`/api/ticket/${ticketId}/attachments/${id}`, { method: 'DELETE' });
+                await anhangLaden();
+            } catch (e) { alert(e.message); }
+        }
+    </script>
+</body>
+</html>

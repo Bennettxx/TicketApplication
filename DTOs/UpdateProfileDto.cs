@@ -1,19 +1,22 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
+using TicketApplication.Functions;
+using TicketApplication.Models;
 
 namespace TicketApplication.DTOs
 {
+    // Partielles Update des eigenen Profils: Jedes Feld ist OPTIONAL.
+    // Nur gesetzte Felder werden übernommen (siehe AccountController.UpdateMe).
+    // Die E-Mail ist BEWUSST nicht enthalten – sie darf nicht geändert werden.
     public class UpdateProfileDto
     {
-        [Required]
-        [MaxLength(50)]
-        public string? FirstName { get; set; } = string.Empty;
+        [MaxLength(50, ErrorMessage = "Vorname darf maximal 50 Zeichen lang sein.")]
+        public string? FirstName { get; set; }
 
-        [Required]
-        [MaxLength(50)]
-        public string? SecondName { get; set; } = string.Empty;
+        [MaxLength(50, ErrorMessage = "Nachname darf maximal 50 Zeichen lang sein.")]
+        public string? SecondName { get; set; }
 
-        [Required]
-        [EmailAddress(ErrorMessage = "Keine gültige E-Mail-Adresse.")]
-        public string? Email { get; set; } = string.Empty;
+        // Abteilung (nur für Rolle User relevant). Muss existieren, wenn gesetzt.
+        [ExistsInColumn(typeof(Department), "Name", ErrorMessage = "Abteilung nicht gefunden.")]
+        public string? DepartmentName { get; set; }
     }
 }

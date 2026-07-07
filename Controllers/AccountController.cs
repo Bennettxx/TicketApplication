@@ -31,6 +31,9 @@ namespace TicketApplication.Controllers
             if (user == null || !user.IsActive)
                 return NotFound();
 
+            string? departmentName = user.DepartmentId == null ? null : await _context.Departments
+                .Where(d => d.Id == user.DepartmentId).Select(d => d.Name).FirstOrDefaultAsync();
+
             return Ok(new UserResponseDto
             {
                 Id = user.Id,
@@ -38,7 +41,9 @@ namespace TicketApplication.Controllers
                 SecondName = user.SecondName,
                 Email = user.Email,
                 Role = user.Role.ToString(),
-                IsActivated = user.IsActivated
+                IsActivated = user.IsActivated,
+                DepartmentId = user.DepartmentId,
+                DepartmentName = departmentName
             });
         }
 
@@ -65,18 +70,19 @@ namespace TicketApplication.Controllers
                 user.SecondName = dto.SecondName;
             }
 
-            if (dto.Email != null)
+            // Abteilung: nur für Rolle User änderbar. Admin/Support haben keine
+            // Abteilung (siehe Vorgabe) – ein gesetzter Wert wird für sie ignoriert.
+            if (dto.DepartmentName != null && user.Role == UserRole.User)
             {
-                if (dto.Email.Trim() == string.Empty)
-                    return BadRequest("E-Mail darf nicht leer sein.");
-
-                bool emailTaken = await _context.Users
-                    .AnyAsync(u => u.Email == dto.Email && u.Id != userId && u.IsActive);
-                if (emailTaken)
-                    return BadRequest("Diese E-Mail-Adresse wird bereits verwendet.");
-
-                user.Email = dto.Email;
+                var depId = await _context.Departments
+                    .Where(d => d.Name == dto.DepartmentName)
+                    .Select(d => (int?)d.Id)
+                    .FirstOrDefaultAsync();
+                if (depId == null) return BadRequest("Abteilung nicht gefunden.");
+                user.DepartmentId = depId;
             }
+
+            // E-Mail wird bewusst NICHT geändert (nicht Teil des DTO).
 
             await _context.SaveChangesAsync();
             return NoContent();

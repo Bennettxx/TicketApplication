@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .kacheln { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+        .kachel {
+            flex: 1; min-width: 150px;
+            background: white; border-radius: 12px; padding: 18px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            border-top: 4px solid #2c3e50;
+        }
+        .kachel .zahl { font-size: 32px; font-weight: bold; color: #2c3e50; }
+        .kachel .label { color: #666; font-size: 14px; margin-top: 4px; }
+        .k-offen { border-top-color: #6c757d; }
+        .k-arbeit { border-top-color: #ffc107; }
+        .k-zu { border-top-color: #28a745; }
+        .k-ich { border-top-color: #1abc9c; }
+        .k-frei { border-top-color: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+
+    <div class="main">
+        <span class="benutzer" id="benutzername">...</span>
+        <h1>Dashboard</h1>
+        <p id="feedback" class="mini"></p>
+
+        <div class="kacheln" id="kacheln"></div>
+
+        <h2 style="color:#2c3e50">Zuletzt erstellt</h2>
+        <div id="recentBereich" class="karte">Lädt...</div>
+    </div>
+
+    <script src="/app.js"></script>
+    <script>
+        (async function () {
+            await seitenleisteAufbauen('dashboard');
+            await dashboardLaden();
+        })();
+
+        async function dashboardLaden() {
+            try {
+                const d = await api('/api/dashboard');
+
+                let kacheln = [
+                    { zahl: d.openCount, label: 'Offen', klasse: 'k-offen' },
+                    { zahl: d.inProgressCount, label: 'In Bearbeitung', klasse: 'k-arbeit' },
+                    { zahl: d.closedCount, label: 'Geschlossen', klasse: 'k-zu' },
+                    { zahl: d.totalCount, label: 'Gesamt', klasse: '' }
+                ];
+                if (d.unreadReplyCount > 0) {
+                    kacheln.unshift({ zahl: d.unreadReplyCount, label: 'Neue Antworten', klasse: 'k-frei' });
+                }
+                if (d.isStaff) {
+                    kacheln.push({ zahl: d.myAssignedOpenCount, label: 'Mir zugewiesen (offen)', klasse: 'k-ich' });
+                    kacheln.push({ zahl: d.unassignedOpenCount, label: 'Nicht zugewiesen (offen)', klasse: 'k-frei' });
+                }
+
+                document.getElementById('kacheln').innerHTML = kacheln.map(k => `
+                    <div class="kachel ${k.klasse}">
+                        <div class="zahl">${k.zahl}</div>
+                        <div class="label">${k.label}</div>
+                    </div>`).join('');
+
+                const r = document.getElementById('recentBereich');
+                if (!d.recent.length) {
+                    r.innerHTML = '<p>Noch keine Tickets.</p>';
+                    return;
+                }
+                r.innerHTML = `
+                    <table>
+                        <thead><tr><th>Nr</th><th>Titel</th><th>Status</th><th>Priorität</th><th>Erstellt</th></tr></thead>
+                        <tbody>${d.recent.map(t => `
+                            <tr style="cursor:pointer" onclick="location.href='/ticket.html?id=${t.id}'">
+                                <td>#${t.id}</td>
+                                <td>${esc(t.title)}</td>
+                                <td><span class="badge" style="background:${STATUS_FARBE[t.statusCode]}">${STATUS_TEXT[t.statusCode]}</span></td>
+                                <td><span class="badge" style="background:${PRIO_FARBE[t.priorityCode]}">${PRIO_TEXT[t.priorityCode]}</span></td>
+                                <td>${new Date(t.createdAt).toLocaleDateString('de-DE')}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+            } catch (e) {
+                document.getElementById('feedback').textContent = e.message;
+            }
+        }
+    </script>
+</body>
+</html>

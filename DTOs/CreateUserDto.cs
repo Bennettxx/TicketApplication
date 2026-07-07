@@ -1,5 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using TicketApplication.Data;
+using TicketApplication.Functions;
+using TicketApplication.Models;
 
 namespace TicketApplication.DTOs
 {
@@ -23,5 +25,9 @@ namespace TicketApplication.DTOs
         public string Password { get; set; } = string.Empty;
 
         public UserRole Role { get; set; } = UserRole.User;
+
+        // Optionale Abteilung (muss existieren, wenn gesetzt).
+        [ExistsInColumn(typeof(Department), "Name", ErrorMessage = "Abteilung nicht gefunden.")]
+        public string? DepartmentName { get; set; }
     }
 }

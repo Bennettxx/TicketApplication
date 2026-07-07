@@ -2,10 +2,10 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using TicketApplication.Data;
 using TicketApplication.DTOs;
 using TicketApplication.Models;
-// using System.Security.Claims;
 
 namespace TicketApplication.Controllers
 {
@@ -28,19 +28,30 @@ namespace TicketApplication.Controllers
             _context = context;
         }
 
-        // Der Benutzername wird auf der startseite.html oben rechts
-        // nicht angezeigt weil  GET /api/user/me fehlt.
-        //
-        // [HttpGet("me")]
-        // [Authorize]
-        // public IActionResult GetMe()
-        // {
-        //     var rolle  = User.FindFirstValue(ClaimTypes.Role);
-        //     var email  = User.FindFirstValue(ClaimTypes.Email);
-        //     var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        //     return Ok(new { userId, email, rolle });
-        // }
-        
+        // GET /api/user/me  ->  Eigene Identität (Id, E-Mail, Rolle).
+        // Wird vom Frontend gebraucht, um Benutzername anzuzeigen und die
+        // Navigation rollenabhängig (Kanban/Statistik nur für Staff) aufzubauen.
+        [HttpGet("me")]
+        public async Task<ActionResult<UserResponseDto>> GetMe()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null || !user.IsActive)
+                return NotFound();
+
+            return Ok(new UserResponseDto
+            {
+                Id = user.Id,
+                FirstName = user.FirstName,
+                SecondName = user.SecondName,
+                Email = user.Email,
+                Role = user.Role.ToString(),
+                IsActivated = user.IsActivated,
+                DepartmentId = user.DepartmentId,
+                DepartmentName = await DepartmentName(user.DepartmentId)
+            });
+        }
 
 
         [HttpGet(Name = "GetUsers")]
@@ -58,7 +69,12 @@ namespace TicketApplication.Controllers
                     SecondName = u.SecondName,
                     Email = u.Email,
                     Role = u.Role.ToString(),  // Enum → lesbarer String (z.B. "Admin")
-                    IsActivated = u.IsActivated
+                    IsActivated = u.IsActivated,
+                    DepartmentId = u.DepartmentId,
+                    DepartmentName = _context.Departments
+                        .Where(d => d.Id == u.DepartmentId)
+                        .Select(d => d.Name)
+                        .FirstOrDefault()
                 })
                 .ToListAsync();
 
@@ -80,7 +96,9 @@ namespace TicketApplication.Controllers
                 SecondName = user.SecondName,
                 Email = user.Email,
                 Role = user.Role.ToString(),
-                IsActivated = user.IsActivated
+                IsActivated = user.IsActivated,
+                DepartmentId = user.DepartmentId,
+                DepartmentName = await DepartmentName(user.DepartmentId)
             });
         }
 
@@ -94,6 +112,13 @@ namespace TicketApplication.Controllers
             if (emailExists)
                 return BadRequest("Diese Email-Adresse wird bereits verwendet.");
 
+            // Abteilung auflösen (Existenz im DTO geprüft).
+            // WICHTIG: Nur die Rolle User bekommt eine Abteilung;
+            // Admin/Support haben grundsätzlich keine.
+            int? departmentId = dto.Role == UserRole.User
+                ? await ResolveDepartmentId(dto.DepartmentName)
+                : null;
+
             // Wir bauen den User selbst zusammen — der Caller hat keine Kontrolle über Id, IsActive etc.
             var user = new User
             {
@@ -102,6 +127,7 @@ namespace TicketApplication.Controllers
                 Email = dto.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 Role = dto.Role,
+                DepartmentId = departmentId,
                 IsActive = true,
                 IsActivated = true  // Vom Admin angelegte User sind sofort freigeschaltet
             };
@@ -117,7 +143,9 @@ namespace TicketApplication.Controllers
                 SecondName = user.SecondName,
                 Email = user.Email,
                 Role = user.Role.ToString(),
-                IsActivated = user.IsActivated
+                IsActivated = user.IsActivated,
+                DepartmentId = user.DepartmentId,
+                DepartmentName = await DepartmentName(user.DepartmentId)
             });
         }
 
@@ -155,6 +183,19 @@ namespace TicketApplication.Controllers
                 user.Email = dto.Email;
             }
             if (dto.Role.HasValue) user.Role = dto.Role.Value;
+
+            // Abteilung nur für Rolle User; Admin/Support haben keine.
+            // Bei Rollenwechsel zu Staff wird eine bestehende Abteilung entfernt.
+            if (user.Role == UserRole.User)
+            {
+                if (dto.DepartmentName != null)
+                    user.DepartmentId = await ResolveDepartmentId(dto.DepartmentName);
+            }
+            else
+            {
+                user.DepartmentId = null;
+            }
+
             if (dto.IsActivated.HasValue) user.IsActivated = dto.IsActivated.Value;
             if (dto.IsActive.HasValue) user.IsActive = dto.IsActive.Value;
             // user.PasswordHash bleibt unberührt!
@@ -206,7 +247,12 @@ namespace TicketApplication.Controllers
                     SecondName = u.SecondName,
                     Email = u.Email,
                     Role = u.Role.ToString(),
-                    IsActivated = u.IsActivated
+                    IsActivated = u.IsActivated,
+                    DepartmentId = u.DepartmentId,
+                    DepartmentName = _context.Departments
+                        .Where(d => d.Id == u.DepartmentId)
+                        .Select(d => d.Name)
+                        .FirstOrDefault()
                 })
                 .ToListAsync();
 
@@ -235,6 +281,25 @@ namespace TicketApplication.Controllers
         private bool UserExists(int id)
         {
             return _context.Users.Any(e => e.Id == id);
+        }
+
+        // E-Mail-/Namens-unabhängige Helfer für die Abteilung.
+        private async Task<int?> ResolveDepartmentId(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
+            return await _context.Departments
+                .Where(d => d.Name == name)
+                .Select(d => (int?)d.Id)
+                .FirstOrDefaultAsync();
+        }
+
+        private async Task<string?> DepartmentName(int? departmentId)
+        {
+            if (departmentId == null) return null;
+            return await _context.Departments
+                .Where(d => d.Id == departmentId)
+                .Select(d => d.Name)
+                .FirstOrDefaultAsync();
         }
     }
 }

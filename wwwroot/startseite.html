@@ -1,128 +1,171 @@
-﻿<!DOCTYPE html>
-<html>
+<!DOCTYPE html>
+<html lang="de">
 <head>
-    <title>Ticket System</title>
-    <style>
-
-        body {
-            font-family: Arial;
-            display: flex; /* Sidebar und Hauptbereich nebeneinander */
-            margin: 0;
-            background: #D3D3D3;
-        }
-
-        /* Linke Navigationsleiste */
-        .sidebar {
-            width: 220px;
-            background: #2c3e50;
-            min-height: 100vh;
-            padding: 20px;
-            color: white;
-        }
-
-            /* Titel der Sidebar */
-            .sidebar h2 {
-                color: white;
-                margin-bottom: 30px; /* Abstand zum ersten Menüpunkt */
-            }
-
-            /* Jeder Menüpunkt in der Sidebar */
-            .sidebar a {
-                display: block; /* Jeder Link in einer eigenen Zeile */
-                color: white;
-                text-decoration: none; /*  Unterstrich */
-                padding: 10px;
-                margin: 5px 0;
-                border-radius: 8px; /*  Ecken rund */
-            }
-
-                /* wenn man mit Maus drüberfährt */
-                .sidebar a:hover {
-                    background: #34495e;
-                }
-
-        /* Hauptbereich */
-        .main {
-            flex: 1; /* Nimmt den restlichen Platz ein */
-            padding: 30px;
-        }
-
-            .main h1 {
-                margin-top: 0;
-            }
-
-
-
-        /* Benutzername  */
-        .benutzer {
-            position: absolute; 
-            top: 15px;
-            right: 20px; 
-            background: white;
-            padding: 7px 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            font-weight: bold;
-            color: #2c3e50;
-        }
-
-        
-    </style>
+    <meta charset="utf-8">
+    <title>Meine Tickets</title>
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
-    <!-- Linke Navigationsleiste mit Menüpunkten -->
-    <div class="sidebar">
-        <h2>Ticket System</h2>
-        <!-- Jeder Link führt später zu einer eigenen Seite; # wird dann mit weiteren Seiten ersetzt -->
-        <a href="#"> Meine Tickets</a>  <!-- a: macht das Button anklickbar -->
-        <a href="/TicketErstellen.html"> Ticket erstellen</a>
-        <a href="/problem-melden.html"> Problem melden</a>
+    <!-- Seitenleiste wird per app.js (rollenabhängig) befüllt -->
+    <div class="sidebar" id="sidebar"></div>
 
-        <a href="#" onclick="abmelden()"> Abmelden</a>
-    </div>
-
-    <!-- Hauptbereich: hier werden die Tickets angezeigt -->
     <div class="main">
-
-        <!-- Benutzername   -->
         <span class="benutzer" id="benutzername">...</span>
 
-        <h1>Meine Tickets</h1>
-        <p>Hier werden die Tickets angezeigt...</p>
+        <h1 id="ueberschrift">Meine Tickets</h1>
+        <p id="hinweis" style="color:#555"></p>
+
+        <!-- Such- & Filterleiste -->
+        <div class="karte" style="margin-bottom:16px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                <div style="flex:2; min-width:180px;">
+                    <label style="margin-top:0;">Suche (Titel/Beschreibung)</label>
+                    <input type="text" id="fSuche" placeholder="Suchbegriff..." oninput="filterDebounce()">
+                </div>
+                <div style="flex:1; min-width:120px;">
+                    <label style="margin-top:0;">Priorität</label>
+                    <select id="fPrio" onchange="ladeMitFilter()">
+                        <option value="">Alle</option>
+                        <option value="0">Low</option>
+                        <option value="1">Medium</option>
+                        <option value="2">High</option>
+                    </select>
+                </div>
+                <div style="flex:1; min-width:130px;">
+                    <label style="margin-top:0;">Abteilung</label>
+                    <select id="fAbteilung" onchange="ladeMitFilter()">
+                        <option value="">Alle</option>
+                    </select>
+                </div>
+                <div style="flex:1; min-width:140px;">
+                    <label style="margin-top:0;">Erstellt von</label>
+                    <input type="date" id="fVon" onchange="ladeMitFilter()">
+                </div>
+                <div style="flex:1; min-width:140px;">
+                    <label style="margin-top:0;">Erstellt bis</label>
+                    <input type="date" id="fBis" onchange="ladeMitFilter()">
+                </div>
+                <div id="fZuweisungBox" style="flex:1; min-width:130px; display:none;">
+                    <label style="margin-top:0;">Zuweisung</label>
+                    <select id="fZuweisung" onchange="ladeMitFilter()">
+                        <option value="">Alle</option>
+                        <option value="me">Mir zugewiesen</option>
+                        <option value="none">Nicht zugewiesen</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="ticketBereich" class="karte">
+            <p>Lädt...</p>
+        </div>
     </div>
 
+    <script src="/app.js"></script>
     <script>
-        // Beim Laden der Seite prüfen ob der User eingeloggt ist
-        // Wenn kein Token vorhanden ist, wird er zurück zum Login geschickt
-        const token = localStorage.getItem('meinToken');
-        if (!token) {
-            window.location.href = '/index.html';
-        }
-        // Benutzername oben rechts laden
-        async function benutzerLaden() {
-            try {
-                const response = await fetch('/api/user/me', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const ich = await response.json();
+        let IST_STAFF = false;
+        let filterTimer = null;
 
-                // Email als Benutzername anzeigen
-                document.getElementById('benutzername').innerText = ` ${ich.email}`;
+        // Seite aufbauen
+        (async function () {
+            await seitenleisteAufbauen('tickets');
+            const mich = await getMich();
+            IST_STAFF = istStaff(mich);
+
+            // Staff sieht ALLE Tickets, ein Kunde nur die eigenen.
+            document.getElementById('ueberschrift').innerText =
+                IST_STAFF ? 'Alle offenen Tickets' : 'Meine offenen Tickets';
+            document.getElementById('hinweis').innerText = IST_STAFF
+                ? 'Offene Tickets. Geschlossene findest du unter „Verlauf".'
+                : 'Deine offenen Tickets. Geschlossene findest du unter „Verlauf".';
+
+            // Zuweisungsfilter nur für Staff einblenden.
+            if (IST_STAFF) document.getElementById('fZuweisungBox').style.display = 'block';
+
+            await abteilungenFuerFilter();
+            await ladeMitFilter();
+        })();
+
+        // Abteilungen in den Filter laden.
+        async function abteilungenFuerFilter() {
+            try {
+                const abt = await api('/api/metadata/departments');
+                const sel = document.getElementById('fAbteilung');
+                abt.forEach(a => {
+                    const o = document.createElement('option');
+                    o.value = a.id; o.textContent = a.name;
+                    sel.appendChild(o);
+                });
+            } catch { /* ignore */ }
+        }
+
+        // Suche mit kleiner Verzögerung (debounce), damit nicht bei jedem
+        // Tastendruck eine Anfrage rausgeht.
+        function filterDebounce() {
+            clearTimeout(filterTimer);
+            filterTimer = setTimeout(ladeMitFilter, 350);
+        }
+
+        // Baut die Query-Parameter aus der Filterleiste und lädt neu.
+        async function ladeMitFilter() {
+            const p = new URLSearchParams();
+            // Startseite zeigt ausschließlich offene (nicht geschlossene) Tickets.
+            p.set('activeOnly', 'true');
+            const q = document.getElementById('fSuche').value.trim();
+            const prio = document.getElementById('fPrio').value;
+            const abt = document.getElementById('fAbteilung').value;
+            const zuw = IST_STAFF ? document.getElementById('fZuweisung').value : '';
+            const von = document.getElementById('fVon').value;
+            const bis = document.getElementById('fBis').value;
+            if (q) p.set('q', q);
+            if (prio !== '') p.set('priority', prio);
+            if (abt !== '') p.set('departmentId', abt);
+            if (zuw) p.set('assignedTo', zuw);
+            if (von) p.set('createdFrom', von);
+            if (bis) p.set('createdTo', bis);
+            await ticketsLaden(IST_STAFF, p.toString());
+        }
+
+        async function ticketsLaden(staff, queryString) {
+            const bereich = document.getElementById('ticketBereich');
+            try {
+                const pfad = queryString ? `/api/ticket?${queryString}` : '/api/ticket';
+                const tickets = await api(pfad);
+                if (!tickets.length) {
+                    bereich.innerHTML = '<p>Noch keine Tickets vorhanden.</p>';
+                    return;
+                }
+
+                let rows = tickets.map(t => `
+                    <tr style="cursor:pointer" onclick="oeffne(${t.id})">
+                        <td>#${t.id}</td>
+                        <td>${esc(t.title)} ${t.hasUnreadReply ? '<span class="badge" style="background:#dc3545">Neue Antwort</span>' : ''}</td>
+                        <td><span class="badge" style="background:${STATUS_FARBE[t.statusCode]}">${STATUS_TEXT[t.statusCode]}</span></td>
+                        <td><span class="badge" style="background:${PRIO_FARBE[t.priorityCode]}">${PRIO_TEXT[t.priorityCode]}</span></td>
+                        <td>${esc(t.departmentName)}</td>
+                        ${staff ? `<td>${esc(t.assignedToEmail || '—')}</td>` : ''}
+                        ${staff ? `<td>${esc(t.createdByEmail)}</td>` : ''}
+                        <td>${new Date(t.createdAt).toLocaleDateString('de-DE')}</td>
+                    </tr>`).join('');
+
+                bereich.innerHTML = `
+                    <table>
+                        <thead><tr>
+                            <th>Nr</th><th>Titel</th><th>Status</th><th>Priorität</th><th>Abteilung</th>
+                            ${staff ? '<th>Bearbeiter</th><th>Ersteller</th>' : ''}
+                            <th>Erstellt</th>
+                        </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>`;
             } catch (e) {
-                console.error('Fehler beim Laden des Benutzers', e);
+                bereich.innerHTML = `<p class="feedback-rot">Fehler beim Laden: ${esc(e.message)}</p>`;
             }
         }
 
-        // Beim Laden der Seite Benutzername holen
-        benutzerLaden();
-
-        // Abmelden: Token löschen und zurück zum Login
-        function abmelden() {
-            localStorage.removeItem('meinToken');
-            window.location.href = '/index.html';
+        function oeffne(id) {
+            window.location.href = `/ticket.html?id=${id}`;
         }
     </script>
-
 </body>
 </html>

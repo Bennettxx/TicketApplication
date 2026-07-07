@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Problemmeldungen</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+
+    <div class="main">
+        <span class="benutzer" id="benutzername">...</span>
+        <h1>Problemmeldungen</h1>
+        <p style="color:#555">Eingegangene Problemmeldungen (auch anonyme). Nur Admins sehen und bearbeiten sie.</p>
+        <p id="feedback" class="mini"></p>
+
+        <!-- Such-/Filterleiste -->
+        <div class="karte" style="margin-bottom:16px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                <div style="flex:2; min-width:200px;">
+                    <label style="margin-top:0;">Suche</label>
+                    <input type="text" id="fSuche" placeholder="Titel, Beschreibung, E-Mail..." oninput="filterDebounce()">
+                </div>
+                <div style="flex:1; min-width:130px;">
+                    <label style="margin-top:0;">Status</label>
+                    <select id="fStatus" onchange="laden()">
+                        <option value="">Alle</option>
+                        <option value="0">Offen</option>
+                        <option value="1">In Bearbeitung</option>
+                        <option value="2">Geschlossen</option>
+                    </select>
+                </div>
+                <div style="flex:1; min-width:130px;">
+                    <label style="margin-top:0;">Priorität</label>
+                    <select id="fPrio" onchange="laden()">
+                        <option value="">Alle</option>
+                        <option value="0">Low</option>
+                        <option value="1">Medium</option>
+                        <option value="2">High</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="bereich" class="karte">Lädt...</div>
+    </div>
+
+    <script src="/app.js"></script>
+    <script>
+        let filterTimer = null;
+
+        (async function () {
+            await seitenleisteAufbauen('probleme');
+            const mich = await getMich();
+            if (mich.role !== 'Admin') {
+                document.querySelector('.main').innerHTML = '<p class="feedback-rot">Kein Zugriff. Nur Admins.</p>';
+                return;
+            }
+            await laden();
+        })();
+
+        function filterDebounce() { clearTimeout(filterTimer); filterTimer = setTimeout(laden, 350); }
+
+        async function laden() {
+            const p = new URLSearchParams();
+            const q = document.getElementById('fSuche').value.trim();
+            const status = document.getElementById('fStatus').value;
+            const prio = document.getElementById('fPrio').value;
+            if (q) p.set('q', q);
+            if (status !== '') p.set('status', status);
+            if (prio !== '') p.set('priority', prio);
+
+            try {
+                const probleme = await api('/api/problem?' + p.toString());
+                const bereich = document.getElementById('bereich');
+                if (!probleme.length) { bereich.innerHTML = '<p>Keine Meldungen.</p>'; return; }
+                bereich.innerHTML = `
+                    <table>
+                        <thead><tr>
+                            <th>Nr</th><th>Titel</th><th>Priorität</th><th>Kontakt</th><th>Eingegangen</th><th>Status</th>
+                        </tr></thead>
+                        <tbody>${probleme.map(x => `
+                            <tr>
+                                <td>#${x.id}</td>
+                                <td><b>${esc(x.title)}</b><br><span class="mini">${esc(x.description).slice(0,120)}</span></td>
+                                <td><span class="badge" style="background:${PRIO_FARBE[x.priorityCode]}">${PRIO_TEXT[x.priorityCode]}</span></td>
+                                <td>${esc(x.contactEmail)}${x.createdByUserId ? '' : '<br><span class="mini">(anonym)</span>'}</td>
+                                <td>${new Date(x.createdAt).toLocaleString('de-DE')}</td>
+                                <td>
+                                    <select onchange="statusAendern(${x.id}, this.value)">
+                                        <option value="0" ${x.statusCode===0?'selected':''}>Offen</option>
+                                        <option value="1" ${x.statusCode===1?'selected':''}>In Bearbeitung</option>
+                                        <option value="2" ${x.statusCode===2?'selected':''}>Geschlossen</option>
+                                    </select>
+                                    <button class="btn-rot" style="padding:4px 8px;" onclick="loeschen(${x.id})">✕</button>
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+            } catch (e) {
+                document.getElementById('bereich').innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+
+        async function statusAendern(id, status) {
+            try {
+                await api(`/api/problem/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: parseInt(status) }) });
+                document.getElementById('feedback').textContent = 'Status gespeichert.';
+            } catch (e) { document.getElementById('feedback').textContent = e.message; }
+        }
+
+        async function loeschen(id) {
+            if (!confirm('Meldung wirklich löschen?')) return;
+            try {
+                await api(`/api/problem/${id}`, { method: 'DELETE' });
+                await laden();
+            } catch (e) { document.getElementById('feedback').textContent = e.message; }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,209 @@
+/* =====================================================================
+   style.css  -  Gemeinsames Layout für alle eingeloggten Seiten
+   ===================================================================== */
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    margin: 0;
+    background: #D3D3D3;
+}
+
+/* Linke Navigationsleiste (wird per app.js befüllt) */
+.sidebar {
+    width: 220px;
+    background: #2c3e50;
+    min-height: 100vh;
+    padding: 20px;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+.sidebar h2 {
+    color: white;
+    margin-bottom: 30px;
+}
+
+.sidebar a {
+    display: block;
+    color: white;
+    text-decoration: none;
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 8px;
+}
+
+.sidebar a:hover {
+    background: #34495e;
+}
+
+.sidebar a.aktiv {
+    background: #1abc9c;
+    font-weight: bold;
+}
+
+.sidebar a.abmelden {
+    margin-top: auto;
+    background: #34495e;
+    text-align: center;
+}
+
+/* Eigenständiger Top-Link (z.B. Startseite), kein Dropdown */
+.sidebar a.nav-top {
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+/* Dropdown-Gruppen in der Sidebar */
+.nav-gruppe {
+    margin-bottom: 4px;
+}
+
+.nav-kopf {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #cdd6df;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 13px;
+    letter-spacing: 0.3px;
+    user-select: none;
+}
+
+.nav-kopf:hover { background: #34495e; }
+
+.nav-kopf .pfeil {
+    transition: transform 0.2s ease;
+    font-size: 12px;
+}
+
+/* Aufgeklappte Gruppe: Pfeil gedreht, Links sichtbar */
+.nav-gruppe.offen .nav-kopf .pfeil {
+    transform: rotate(180deg);
+}
+
+/* Links sind standardmäßig eingeklappt */
+.nav-links {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+}
+
+.nav-gruppe.offen .nav-links {
+    max-height: 400px;
+}
+
+.nav-links a {
+    font-size: 14px;
+    padding-left: 22px;
+}
+
+/* Hauptbereich */
+.main {
+    flex: 1;
+    padding: 30px;
+    box-sizing: border-box;
+}
+
+.main h1 {
+    margin-top: 0;
+}
+
+/* Benutzername oben rechts */
+.benutzer {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    background: white;
+    padding: 7px 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+/* Weiße Karte */
+.karte {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    padding: 20px;
+}
+
+/* Tabellen */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+th, td {
+    text-align: left;
+    padding: 12px 14px;
+    border-bottom: 1px solid #eee;
+}
+
+th {
+    background: #2c3e50;
+    color: white;
+    font-size: 14px;
+}
+
+tr:hover td {
+    background: #f7f9fb;
+}
+
+/* Badges für Status/Priorität */
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* Buttons */
+button, .btn {
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    color: white;
+    background: #2c3e50;
+}
+
+button:hover, .btn:hover { opacity: 0.9; }
+
+.btn-gruen { background: #28a745; }
+.btn-grau  { background: #6c757d; }
+.btn-rot   { background: #dc3545; }
+
+input, textarea, select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+label {
+    display: block;
+    margin-top: 12px;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.feedback-rot   { color: #dc3545; font-weight: bold; }
+.feedback-gruen { color: #28a745; font-weight: bold; }

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Kanban-Board</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .board { display: flex; gap: 16px; align-items: flex-start; }
+        .spalte {
+            flex: 1;
+            background: #e9edf0;
+            border-radius: 12px;
+            padding: 12px;
+            min-height: 300px;
+        }
+        .spalte h3 {
+            margin: 4px 0 12px;
+            color: #2c3e50;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .spalte h3 .zaehler {
+            background: #2c3e50; color: white; border-radius: 10px;
+            font-size: 12px; padding: 1px 8px;
+        }
+        .spalte.drop-aktiv { outline: 2px dashed #1abc9c; }
+
+        .ticketkarte {
+            background: white;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            cursor: grab;
+            border-left: 5px solid #ccc;
+        }
+        .ticketkarte:active { cursor: grabbing; }
+        .ticketkarte .nr { font-size: 12px; color: #888; }
+        .ticketkarte .titel { font-weight: bold; color: #2c3e50; margin: 4px 0; }
+        .ticketkarte .fuss { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+        .ticketkarte .oeffnen { font-size: 12px; color: #1abc9c; cursor: pointer; }
+
+        /* Zeitraum-Umschalter */
+        .modus { display: flex; gap: 8px; margin-bottom: 12px; }
+        .modus-btn {
+            background: white; color: #2c3e50; border: 2px solid #ccc;
+            border-radius: 8px; padding: 8px 16px; cursor: pointer; font-size: 14px;
+        }
+        .modus-btn.aktiv { background: #2c3e50; color: white; border-color: #2c3e50; }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+
+    <div class="main">
+        <span class="benutzer" id="benutzername">...</span>
+        <h1>Kanban-Board</h1>
+        <p style="color:#555">Ziehe eine Ticketkarte in eine andere Spalte, um den Status zu ändern. Klicke „Öffnen“ für Details &amp; Chat.</p>
+
+        <!-- Zeitraum-Modus: gesamt / letzte 60 Tage / letzte 30 Tage (nach letztem Update) -->
+        <div class="modus" id="modus">
+            <button class="modus-btn aktiv" data-tage="0" onclick="setModus(0, this)">Gesamt</button>
+            <button class="modus-btn" data-tage="60" onclick="setModus(60, this)">Letzte 60 Tage</button>
+            <button class="modus-btn" data-tage="30" onclick="setModus(30, this)">Letzte 30 Tage</button>
+        </div>
+        <p id="feedback" class="mini"></p>
+
+        <div class="board" id="board">
+            <div class="spalte" data-status="0" ondragover="erlaube(event)" ondrop="ablegen(event)" ondragleave="verlasse(event)">
+                <h3>Offen <span class="zaehler" id="z0">0</span></h3>
+                <div id="spalte-0"></div>
+            </div>
+            <div class="spalte" data-status="1" ondragover="erlaube(event)" ondrop="ablegen(event)" ondragleave="verlasse(event)">
+                <h3>In Bearbeitung <span class="zaehler" id="z1">0</span></h3>
+                <div id="spalte-1"></div>
+            </div>
+            <div class="spalte" data-status="2" ondragover="erlaube(event)" ondrop="ablegen(event)" ondragleave="verlasse(event)">
+                <h3>Geschlossen <span class="zaehler" id="z2">0</span></h3>
+                <div id="spalte-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+    <script>
+        (async function () {
+            await seitenleisteAufbauen('kanban');
+            const mich = await getMich();
+            if (!istStaff(mich)) {
+                document.querySelector('.main').innerHTML =
+                    '<p class="feedback-rot">Kein Zugriff. Nur Admin/Support.</p>';
+                return;
+            }
+            await boardLaden();
+        })();
+
+        const STATUS_MAP = {}; // Ticket-Id -> aktueller statusCode (für Reopen-Erkennung)
+        let ALLE_TICKETS = []; // alle geladenen Tickets
+        let MODUS_TAGE = 0;    // 0 = gesamt, sonst Anzahl Tage (Erstelldatum)
+
+        async function boardLaden() {
+            try {
+                ALLE_TICKETS = await api('/api/ticket');
+                boardRendern();
+            } catch (e) {
+                document.getElementById('feedback').textContent = e.message;
+            }
+        }
+
+        // Zeitraum-Modus umschalten.
+        function setModus(tage, btn) {
+            MODUS_TAGE = tage;
+            document.querySelectorAll('.modus-btn').forEach(b => b.classList.remove('aktiv'));
+            btn.classList.add('aktiv');
+            boardRendern();
+        }
+
+        // Board anhand des aktuellen Zeitraum-Modus neu zeichnen.
+        function boardRendern() {
+            [0, 1, 2].forEach(s => document.getElementById(`spalte-${s}`).innerHTML = '');
+            const zaehler = { 0: 0, 1: 0, 2: 0 };
+
+            // Nach letztem Update filtern (0 = alle).
+            const grenze = MODUS_TAGE > 0 ? Date.now() - MODUS_TAGE * 24 * 60 * 60 * 1000 : null;
+            const liste = ALLE_TICKETS.filter(t =>
+                grenze === null || new Date(t.updatedAt).getTime() >= grenze);
+
+            liste.forEach(t => {
+                zaehler[t.statusCode]++;
+                STATUS_MAP[t.id] = t.statusCode;
+                const div = document.createElement('div');
+                div.className = 'ticketkarte';
+                div.draggable = true;
+                div.dataset.id = t.id;
+                div.style.borderLeftColor = PRIO_FARBE[t.priorityCode];
+                div.ondragstart = (e) => e.dataTransfer.setData('text/plain', t.id);
+                div.innerHTML = `
+                    <div class="nr">#${t.id} · ${esc(t.departmentName)}</div>
+                    <div class="titel">${esc(t.title)}</div>
+                    <div class="mini">${esc(t.assignedToEmail || 'nicht zugewiesen')}</div>
+                    <div class="fuss">
+                        <span class="badge" style="background:${PRIO_FARBE[t.priorityCode]}">${PRIO_TEXT[t.priorityCode]}</span>
+                        <span class="oeffnen" onclick="oeffne(${t.id})">Öffnen →</span>
+                    </div>`;
+                document.getElementById(`spalte-${t.statusCode}`).appendChild(div);
+            });
+
+            [0, 1, 2].forEach(s => document.getElementById(`z${s}`).textContent = zaehler[s]);
+        }
+
+        function erlaube(e) { e.preventDefault(); e.currentTarget.classList.add('drop-aktiv'); }
+        function verlasse(e) { e.currentTarget.classList.remove('drop-aktiv'); }
+
+        async function ablegen(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drop-aktiv');
+            const id = e.dataTransfer.getData('text/plain');
+            const neuerStatus = parseInt(e.currentTarget.dataset.status);
+            const alterStatus = STATUS_MAP[id];
+
+            // Aus "Geschlossen" heraus = Wiedereröffnen -> Pflicht-Nachricht.
+            if (alterStatus === 2 && neuerStatus !== 2) {
+                const nachricht = prompt('Ticket wiedereröffnen – bitte eine Nachricht angeben:');
+                if (nachricht === null || nachricht.trim() === '') {
+                    document.getElementById('feedback').textContent = 'Wiedereröffnen abgebrochen (Nachricht erforderlich).';
+                    await boardLaden();
+                    return;
+                }
+                try {
+                    await api(`/api/ticket/${id}/reopen`, {
+                        method: 'POST',
+                        body: JSON.stringify({ message: nachricht.trim() })
+                    });
+                    await boardLaden();
+                } catch (err) {
+                    document.getElementById('feedback').textContent = err.message;
+                    await boardLaden();
+                }
+                return;
+            }
+
+            try {
+                await api(`/api/ticket/${id}/status`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ ticketId: parseInt(id), status: neuerStatus })
+                });
+                await boardLaden();
+            } catch (err) {
+                document.getElementById('feedback').textContent = err.message;
+                await boardLaden();
+            }
+        }
+
+        function oeffne(id) { window.location.href = `/ticket.html?id=${id}`; }
+    </script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+===========================================================================
+ KONFIGURATION ÜBER UMGEBUNGSVARIABLEN (Produktivbetrieb)
+===========================================================================
+
+WARUM?
+------
+Sensible Werte (Datenbank-Zugang, Schlüssel) gehören nicht in Dateien im
+Repository. In der Entwicklung liegen sie lokal in 'appsettings.Local.json'
+(steht in .gitignore). Im Produktivbetrieb kommen sie stattdessen aus
+UMGEBUNGSVARIABLEN des Servers/Containers.
+
+
+WIE UNTERSCHEIDET DIE APP DEV vs. PROD?
+---------------------------------------
+Über die Umgebungsvariable ASPNETCORE_ENVIRONMENT:
+  - "Development"  -> lädt appsettings.Local.json, erzeugt fehlende Schlüssel
+                     automatisch. (Standard beim Start aus Visual Studio.)
+  - "Production"   -> ignoriert Local.json, erwartet ALLE Werte als
+                     Umgebungsvariablen. Fehlt einer, startet die App nicht
+                     und meldet, welcher Wert fehlt.
+
+Für Produktion also setzen:
+  ASPNETCORE_ENVIRONMENT = Production
+
+
+WICHTIG: NAMENSKONVENTION (doppelter Unterstrich!)
+--------------------------------------------------
+In der Konfiguration steht ein Doppelpunkt (z.B. "Jwt:Key"). In
+Umgebungsvariablen ist der Doppelpunkt nicht überall erlaubt, deshalb schreibt
+man ihn als ZWEI Unterstriche "__".
+
+  Konfig-Schlüssel                       Umgebungsvariable
+  -------------------------------------  ------------------------------------
+  ConnectionStrings:DefaultConnection    ConnectionStrings__DefaultConnection
+  Jwt:Key                                Jwt__Key
+  Attachments:Key                        Attachments__Key
+
+Optional überschreibbar (haben Defaults in appsettings.json):
+  Jwt:Issuer                             Jwt__Issuer
+  Jwt:Audience                           Jwt__Audience
+  Jwt:DurationInMinutes                  Jwt__DurationInMinutes
+
+
+WELCHE WERTE?
+-------------
+1) ConnectionStrings__DefaultConnection
+   Der SQL-Server-Verbindungsstring, z.B.:
+   Server=DBHOST;Database=TicketApp;User Id=appuser;Password=***;TrustServerCertificate=True;
+
+2) Jwt__Key
+   Geheimer Schlüssel zum Signieren der Login-Token. Mindestens 32 zufällige
+   Zeichen. Beispiel zum Erzeugen (PowerShell):
+     [Convert]::ToBase64String((1..32 | % {Get-Random -Max 256}))
+
+3) Attachments__Key
+   32-Byte-Schlüssel (Base64) zum Verschlüsseln privater Datei-Anhänge.
+   Beispiel (PowerShell):
+     [Convert]::ToBase64String((1..32 | % {Get-Random -Max 256}))
+
+
+SETZEN DER VARIABLEN – BEISPIELE
+--------------------------------
+Windows (PowerShell, dauerhaft für den Benutzer):
+  setx ASPNETCORE_ENVIRONMENT "Production"
+  setx ConnectionStrings__DefaultConnection "Server=...;Database=...;User Id=...;Password=...;TrustServerCertificate=True;"
+  setx Jwt__Key "DEIN_LANGER_GEHEIMER_KEY"
+  setx Attachments__Key "DEIN_BASE64_32BYTE_KEY"
+  (Neues Terminal öffnen, damit die Werte greifen.)
+
+Linux / macOS (bash, für die aktuelle Sitzung):
+  export ASPNETCORE_ENVIRONMENT=Production
+  export ConnectionStrings__DefaultConnection="Server=...;Database=...;User Id=...;Password=...;TrustServerCertificate=True;"
+  export Jwt__Key="DEIN_LANGER_GEHEIMER_KEY"
+  export Attachments__Key="DEIN_BASE64_32BYTE_KEY"
+
+Docker (docker run):
+  docker run -e ASPNETCORE_ENVIRONMENT=Production ^
+             -e ConnectionStrings__DefaultConnection="..." ^
+             -e Jwt__Key="..." ^
+             -e Attachments__Key="..." ^
+             meintickets:latest
+
+Docker Compose (Auszug):
+  environment:
+    - ASPNETCORE_ENVIRONMENT=Production
+    - ConnectionStrings__DefaultConnection=...
+    - Jwt__Key=...
+    - Attachments__Key=...
+
+
+ZUSAMMENGEFASST
+---------------
+- Entwicklung: nichts weiter tun, Local.json wird genutzt, Keys entstehen
+  automatisch.
+- Produktion: ASPNETCORE_ENVIRONMENT=Production + die drei Variablen oben
+  setzen. Ohne sie startet die App bewusst nicht.
+===========================================================================

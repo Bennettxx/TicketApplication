@@ -29,20 +29,31 @@ builder.Services.AddCors(options =>
     });
 });
 // =========================================================================
-// LOKALE KONFIGURATION
-// Lädt appsettings.Local.json zusätzlich zu appsettings.json.
-// Diese Datei steht in der .gitignore und enthält maschinenspezifische
-// Werte: Connection-String, JWT-Key. Gehört NICHT ins Repo.
+// KONFIGURATION – abhängig von der Umgebung
+//
+//  DEVELOPMENT: Werte kommen aus 'appsettings.Local.json' (maschinenspezifisch,
+//               steht in .gitignore). Fehlende Schlüssel (JWT/Anhang) werden
+//               automatisch erzeugt und dort gespeichert.
+//
+//  PRODUCTION:  Werte kommen ausschließlich aus UMGEBUNGSVARIABLEN
+//               (ConnectionStrings__DefaultConnection, Jwt__Key,
+//               Attachments__Key). Details: ANLEITUNG_UMGEBUNGSVARIABLEN.txt.
+//
+// Umgebungsvariablen sind vom Default-Host bereits als Konfigurationsquelle
+// registriert; wir laden die lokale JSON nur in der Entwicklung, damit sie in
+// Produktion NICHT die Umgebungsvariablen überschreibt.
 // =========================================================================
-builder.Configuration.AddJsonFile(
-    "appsettings.Local.json",
-    optional: true,
-    reloadOnChange: true);
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddJsonFile(
+        "appsettings.Local.json",
+        optional: true,
+        reloadOnChange: true);
 
-// JWT-Key prüfen — falls keiner gesetzt ist (z.B. beim allerersten Start),
-// einen kryptographisch sicheren generieren und in appsettings.Local.json
-// speichern. So bekommt jede Installation ihren eigenen einzigartigen Key.
-EnsureJwtKeyExists(builder);
+    // Fehlende Schlüssel lokal automatisch erzeugen und in Local.json ablegen.
+    EnsureJwtKeyExists(builder);
+    EnsureAttachmentKeyExists(builder);
+}
 
 // Connection-String prüfen — sonst kommt später eine sehr kryptische
 // Fehlermeldung aus dem EF-Core-Innern.
@@ -51,7 +62,21 @@ if (string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException(
         "ConnectionStrings:DefaultConnection ist nicht konfiguriert. " +
-        "Bitte 'appsettings.Local.json' anlegen — Vorlage: 'appsettings.Local.json.example'.");
+        "Development: 'appsettings.Local.json' anlegen. " +
+        "Production: Umgebungsvariable 'ConnectionStrings__DefaultConnection' setzen " +
+        "(siehe ANLEITUNG_UMGEBUNGSVARIABLEN.txt).");
+}
+
+// In Produktion müssen die sicherheitsrelevanten Schlüssel per Umgebungsvariable
+// gesetzt sein — es wird dort NICHTS automatisch generiert/geschrieben.
+if (!builder.Environment.IsDevelopment())
+{
+    if (string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Key"]))
+        throw new InvalidOperationException(
+            "Jwt:Key fehlt. In Produktion Umgebungsvariable 'Jwt__Key' setzen (siehe ANLEITUNG_UMGEBUNGSVARIABLEN.txt).");
+    if (string.IsNullOrWhiteSpace(builder.Configuration["Attachments:Key"]))
+        throw new InvalidOperationException(
+            "Attachments:Key fehlt. In Produktion Umgebungsvariable 'Attachments__Key' setzen (siehe ANLEITUNG_UMGEBUNGSVARIABLEN.txt).");
 }
 
 // Add services to the container. Auch Dependency Injection genannt - welche Services stehen später zur Verfügung.
@@ -100,14 +125,28 @@ if (app.Environment.IsDevelopment())
 // Leitet HTTP Aufrufe als HTTPS weiter
 app.UseHttpsRedirection();
 app.UseDefaultFiles(); // Sucht automatisch nach der index.html
-app.UseStaticFiles();  // Erlaubt das Ausliefern von HTML/CSS/JS
-   
+
+// Statische Dateien (HTML/CSS/JS) ausliefern.
+// In der ENTWICKLUNG setzen wir "no-cache", damit der Browser Änderungen an
+// wwwroot-Dateien SOFORT sieht und nicht eine alte Version aus dem Cache zeigt.
+// (Das war die Ursache, warum Frontend-Fixes scheinbar nicht ankamen.)
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (app.Environment.IsDevelopment())
+        {
+            ctx.Context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+            ctx.Context.Response.Headers["Pragma"] = "no-cache";
+            ctx.Context.Response.Headers["Expires"] = "0";
+        }
+    }
+});
 
 // Aktiviert oben definierte CORS-Regel "AllowAll"
-// Muss vor app.UseAuthentication() stehen, damit der Browser die Erlaubnis 
+// Muss vor app.UseAuthentication() stehen, damit der Browser die Erlaubnis
 // bekommt bevor er versucht sich einzuloggen.
 app.UseCors("AllowAll");
-app.UseStaticFiles();
 
 app.UseAuthentication();
 
@@ -210,4 +249,46 @@ static void EnsureJwtKeyExists(WebApplicationBuilder builder)
     Console.WriteLine(" 'appsettings.Local.json' gespeichert.");
     Console.WriteLine(" Diese Datei NICHT ins Git-Repo committen!");
     Console.WriteLine("================================================================");
+}
+
+// Stellt sicher, dass ein 32-Byte-Schlüssel (Base64) für die AES-GCM-
+// Verschlüsselung privater Anhänge existiert. Wird wie der JWT-Key beim ersten
+// Start erzeugt und in appsettings.Local.json gespeichert.
+static void EnsureAttachmentKeyExists(WebApplicationBuilder builder)
+{
+    var existingKey = builder.Configuration["Attachments:Key"];
+    if (!string.IsNullOrWhiteSpace(existingKey))
+        return;
+
+    var randomBytes = new byte[32]; // 256 Bit
+    RandomNumberGenerator.Fill(randomBytes);
+    var newKey = Convert.ToBase64String(randomBytes);
+
+    var localJsonPath = Path.Combine(builder.Environment.ContentRootPath, "appsettings.Local.json");
+    JsonObject root;
+    if (File.Exists(localJsonPath))
+    {
+        var content = File.ReadAllText(localJsonPath);
+        root = string.IsNullOrWhiteSpace(content)
+            ? new JsonObject()
+            : JsonNode.Parse(content)!.AsObject();
+    }
+    else
+    {
+        root = new JsonObject();
+    }
+
+    if (root["Attachments"] is not JsonObject section)
+    {
+        section = new JsonObject();
+        root["Attachments"] = section;
+    }
+    section["Key"] = newKey;
+
+    var writeOptions = new JsonSerializerOptions { WriteIndented = true };
+    File.WriteAllText(localJsonPath, root.ToJsonString(writeOptions));
+
+    ((IConfigurationRoot)builder.Configuration).Reload();
+
+    Console.WriteLine(" Anhang-Verschlüsselungsschlüssel generiert und in 'appsettings.Local.json' gespeichert.");
 }
