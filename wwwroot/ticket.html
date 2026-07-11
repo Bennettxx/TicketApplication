@@ -45,7 +45,7 @@
         <h1 id="titel">Ticket</h1>
 
         <div class="grid">
-            <!-- LINKS: Beschreibung + Chat -->
+            <!-- links: beschreibung + chat -->
             <div class="spalte-links">
                 <div class="karte" id="beschreibung" style="margin-bottom:20px;">Lädt...</div>
 
@@ -66,11 +66,10 @@
                 </div>
             </div>
 
-            <!-- RECHTS: Status/Zuweisung/Zeit (Zeit + Steuerung nur Staff) -->
+            <!-- rechts: info, reopen, anhänge, staff-steuerung, zeiterfassung -->
             <div class="spalte-rechts">
                 <div class="karte" id="infoKarte" style="margin-bottom:20px;">Lädt...</div>
 
-                <!-- Wiedereröffnen (nur wenn geschlossen) -->
                 <div class="karte" id="reopenKarte" style="display:none; margin-bottom:20px; border-left:4px solid #dc3545;">
                     <h3 style="margin-top:0">Ticket wiedereröffnen</h3>
                     <p class="mini">Dieses Ticket ist geschlossen. Zum Wiedereröffnen ist eine Nachricht erforderlich.</p>
@@ -79,7 +78,6 @@
                     <span id="reopenFeedback" class="mini"></span>
                 </div>
 
-                <!-- Anhänge (für alle, die das Ticket sehen dürfen) -->
                 <div class="karte" id="anhangKarte" style="margin-bottom:20px;">
                     <h3 style="margin-top:0">Anhänge</h3>
                     <div id="anhangListe"><p class="mini">Lädt...</p></div>
@@ -94,7 +92,6 @@
                     <span id="anhangFeedback" class="mini"></span>
                 </div>
 
-                <!-- Staff-Steuerung -->
                 <div class="karte" id="staffKarte" style="display:none; margin-bottom:20px;">
                     <h3 style="margin-top:0">Bearbeitung</h3>
 
@@ -112,7 +109,6 @@
                     <span id="staffFeedback" class="mini"></span>
                 </div>
 
-                <!-- Zeiterfassung (nur Staff) -->
                 <div class="karte" id="zeitKarte" style="display:none;">
                     <h3 style="margin-top:0">Zeiterfassung</h3>
                     <p class="mini">Gesamt: <b id="zeitGesamt">0m</b></p>
@@ -134,8 +130,8 @@
     <script src="/app.js"></script>
     <script>
         const ticketId = new URLSearchParams(window.location.search).get('id');
-        // MICH ist global in app.js deklariert und wird von getMich() gefüllt.
 
+        // seite aufbauen, staff-bereiche einblenden, ticket + chat + anhänge laden
         (async function () {
             await seitenleisteAufbauen('tickets');
             MICH = await getMich();
@@ -158,10 +154,11 @@
             await chatLaden();
             await anhangLaden();
 
-            // Als gelesen markieren -> Benachrichtigung verschwindet.
+            // als gelesen markieren, entfernt die "neue antwort"-markierung
             try { await api(`/api/ticket/${ticketId}/read`, { method: 'POST' }); } catch { }
         })();
 
+        // ticketdaten laden und beschreibung + infokarte füllen
         async function ticketLaden() {
             try {
                 const t = await api(`/api/ticket/${ticketId}`);
@@ -175,12 +172,20 @@
                     <h4>Aktuelles Ergebnis</h4>
                     <p style="white-space:pre-wrap">${esc(t.actualResult) || '—'}</p>`;
 
+                // referenz-zeile nur wenn vorhanden
+                const referenz = t.referenceTicketId
+                    ? `<div class="info-zeile"><span>Referenz</span><b>
+                           <a href="/ticket.html?id=${t.referenceTicketId}">#${t.referenceTicketId}</a>
+                           ${t.referenceComment ? ' · ' + esc(t.referenceComment) : ''}</b></div>`
+                    : '';
+
                 document.getElementById('infoKarte').innerHTML = `
                     <h3 style="margin-top:0">Info</h3>
                     <div class="info-zeile"><span>Status</span><span class="badge" style="background:${STATUS_FARBE[t.statusCode]}">${STATUS_TEXT[t.statusCode]}</span></div>
                     <div class="info-zeile"><span>Priorität</span><span class="badge" style="background:${PRIO_FARBE[t.priorityCode]}">${PRIO_TEXT[t.priorityCode]}</span></div>
                     <div class="info-zeile"><span>Abteilung</span><b>${esc(t.departmentName)}</b></div>
                     <div class="info-zeile"><span>Thema</span><b>${esc(t.subjectName)}</b></div>
+                    ${referenz}
                     <div class="info-zeile"><span>Ersteller</span><b>${esc(t.createdByEmail)}</b></div>
                     <div class="info-zeile"><span>Bearbeiter</span><b>${esc(t.assignedToEmail || '—')}</b></div>
                     <div class="info-zeile"><span>Erfasste Zeit</span><b>${minutenFormat(t.totalMinutes)}</b></div>
@@ -189,11 +194,10 @@
                 if (istStaff(MICH)) {
                     document.getElementById('statusSelect').value = t.statusCode;
                     document.getElementById('assignSelect').value = t.assignedToEmail || '';
-                    // Geschlossen: Status-Auswahl sperren -> Wiedereröffnen nur über Nachricht.
+                    // geschlossen: statuswechsel gesperrt, reopen nur mit nachricht
                     document.getElementById('statusSelect').disabled = (t.statusCode === 2);
                 }
 
-                // Wiedereröffnen-Karte nur bei geschlossenem Ticket zeigen (Ersteller + Staff).
                 document.getElementById('reopenKarte').style.display =
                     (t.statusCode === 2) ? 'block' : 'none';
             } catch (e) {
@@ -201,7 +205,7 @@
             }
         }
 
-        // ---- Chat ----
+        // chatverlauf laden und rendern
         async function chatLaden() {
             const chat = document.getElementById('chat');
             try {
@@ -224,6 +228,7 @@
             }
         }
 
+        // neue chat-nachricht senden
         async function nachrichtSenden() {
             const fb = document.getElementById('chatFeedback');
             const text = document.getElementById('chatText').value.trim();
@@ -241,21 +246,21 @@
             } catch (e) { fb.textContent = e.message; }
         }
 
-        // ---- Status / Zuweisung (Staff) ----
+        // status über das dropdown ändern (staff)
         async function statusAendern() {
             const fb = document.getElementById('staffFeedback');
             const status = parseInt(document.getElementById('statusSelect').value);
             try {
                 await api(`/api/ticket/${ticketId}/status`, {
                     method: 'PATCH',
-                    body: JSON.stringify({ ticketId: parseInt(ticketId), status: status })
+                    body: JSON.stringify({ status: status })
                 });
                 fb.textContent = 'Status gespeichert.';
                 await ticketLaden();
             } catch (e) { fb.textContent = e.message; }
         }
 
-        // Wiedereröffnen mit Pflicht-Nachricht.
+        // wiedereröffnen mit pflicht-nachricht
         async function wiedereroeffnen() {
             const fb = document.getElementById('reopenFeedback');
             const text = document.getElementById('reopenText').value.trim();
@@ -272,6 +277,7 @@
             } catch (e) { fb.textContent = e.message; }
         }
 
+        // bearbeiterliste ins zuweisungs-dropdown laden
         async function bearbeiterLaden() {
             try {
                 const agents = await api('/api/metadata/agents');
@@ -281,9 +287,10 @@
                     o.value = a.email; o.textContent = a.email;
                     sel.appendChild(o);
                 });
-            } catch { /* ignore */ }
+            } catch { }
         }
 
+        // ticket einem bearbeiter zuweisen
         async function zuweisen() {
             const fb = document.getElementById('staffFeedback');
             const email = document.getElementById('assignSelect').value;
@@ -297,7 +304,7 @@
             } catch (e) { fb.textContent = e.message; }
         }
 
-        // ---- Zeiterfassung (Staff) ----
+        // zeiteinträge laden und summe anzeigen
         async function zeitLaden() {
             try {
                 const eintraege = await api(`/api/ticket/${ticketId}/time`);
@@ -312,9 +319,10 @@
                     </div>`;
                 }).join('') || '<p class="mini">Noch keine Einträge.</p>';
                 document.getElementById('zeitGesamt').textContent = minutenFormat(gesamt);
-            } catch (e) { /* ignore */ }
+            } catch (e) { }
         }
 
+        // neuen zeiteintrag anlegen
         async function zeitErfassen() {
             const fb = document.getElementById('zeitFeedback');
             const minutes = parseInt(document.getElementById('zeitMinuten').value);
@@ -334,6 +342,7 @@
             } catch (e) { fb.textContent = e.message; }
         }
 
+        // zeiteintrag löschen
         async function zeitLoeschen(id) {
             try {
                 await api(`/api/ticket/${ticketId}/time/${id}`, { method: 'DELETE' });
@@ -342,13 +351,14 @@
             } catch (e) { alert(e.message); }
         }
 
-        // ---- Anhänge ----
+        // bytes lesbar formatieren
         function groesse(bytes) {
             if (bytes < 1024) return bytes + ' B';
             if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
             return (bytes / 1024 / 1024).toFixed(1) + ' MB';
         }
 
+        // anhangliste laden
         async function anhangLaden() {
             const liste = document.getElementById('anhangListe');
             try {
@@ -371,6 +381,7 @@
             }
         }
 
+        // datei hochladen, eigener fetch wegen multipart
         async function anhangHochladen() {
             const fb = document.getElementById('anhangFeedback');
             const input = document.getElementById('anhangDatei');
@@ -384,7 +395,6 @@
 
             fb.textContent = 'Lädt hoch...';
             try {
-                // Eigener fetch, da Multipart (nicht der JSON-Wrapper).
                 const res = await fetch(`/api/ticket/${ticketId}/attachments`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${TOKEN}` },
@@ -403,6 +413,7 @@
             } catch (e) { fb.textContent = 'Server nicht erreichbar.'; }
         }
 
+        // datei herunterladen und als download anstoßen
         async function anhangDownload(id, name) {
             try {
                 const res = await fetch(`/api/ticket/${ticketId}/attachments/${id}/download`, {
@@ -418,6 +429,7 @@
             } catch (e) { alert('Server nicht erreichbar.'); }
         }
 
+        // anhang löschen
         async function anhangLoeschen(id) {
             if (!confirm('Anhang wirklich löschen?')) return;
             try {

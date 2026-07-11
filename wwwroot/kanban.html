@@ -39,7 +39,6 @@
         .ticketkarte .fuss { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
         .ticketkarte .oeffnen { font-size: 12px; color: #1abc9c; cursor: pointer; }
 
-        /* Zeitraum-Umschalter */
         .modus { display: flex; gap: 8px; margin-bottom: 12px; }
         .modus-btn {
             background: white; color: #2c3e50; border: 2px solid #ccc;
@@ -56,7 +55,7 @@
         <h1>Kanban-Board</h1>
         <p style="color:#555">Ziehe eine Ticketkarte in eine andere Spalte, um den Status zu ändern. Klicke „Öffnen“ für Details &amp; Chat.</p>
 
-        <!-- Zeitraum-Modus: gesamt / letzte 60 Tage / letzte 30 Tage (nach letztem Update) -->
+        <!-- zeitraum-umschalter: gesamt / 60 tage / 30 tage (nach letztem update) -->
         <div class="modus" id="modus">
             <button class="modus-btn aktiv" data-tage="0" onclick="setModus(0, this)">Gesamt</button>
             <button class="modus-btn" data-tage="60" onclick="setModus(60, this)">Letzte 60 Tage</button>
@@ -82,6 +81,7 @@
 
     <script src="/app.js"></script>
     <script>
+        // seite aufbauen, nur staff
         (async function () {
             await seitenleisteAufbauen('kanban');
             const mich = await getMich();
@@ -93,10 +93,11 @@
             await boardLaden();
         })();
 
-        const STATUS_MAP = {}; // Ticket-Id -> aktueller statusCode (für Reopen-Erkennung)
-        let ALLE_TICKETS = []; // alle geladenen Tickets
-        let MODUS_TAGE = 0;    // 0 = gesamt, sonst Anzahl Tage (Erstelldatum)
+        const STATUS_MAP = {}; // ticket-id -> statuscode, für die reopen-erkennung
+        let ALLE_TICKETS = [];
+        let MODUS_TAGE = 0;    // 0 = gesamt, sonst tage seit letztem update
 
+        // alle tickets laden und board zeichnen
         async function boardLaden() {
             try {
                 ALLE_TICKETS = await api('/api/ticket');
@@ -106,7 +107,7 @@
             }
         }
 
-        // Zeitraum-Modus umschalten.
+        // zeitraum-modus umschalten
         function setModus(tage, btn) {
             MODUS_TAGE = tage;
             document.querySelectorAll('.modus-btn').forEach(b => b.classList.remove('aktiv'));
@@ -114,12 +115,11 @@
             boardRendern();
         }
 
-        // Board anhand des aktuellen Zeitraum-Modus neu zeichnen.
+        // spalten leeren und tickets im gewählten zeitraum neu einsortieren
         function boardRendern() {
             [0, 1, 2].forEach(s => document.getElementById(`spalte-${s}`).innerHTML = '');
             const zaehler = { 0: 0, 1: 0, 2: 0 };
 
-            // Nach letztem Update filtern (0 = alle).
             const grenze = MODUS_TAGE > 0 ? Date.now() - MODUS_TAGE * 24 * 60 * 60 * 1000 : null;
             const liste = ALLE_TICKETS.filter(t =>
                 grenze === null || new Date(t.updatedAt).getTime() >= grenze);
@@ -147,9 +147,13 @@
             [0, 1, 2].forEach(s => document.getElementById(`z${s}`).textContent = zaehler[s]);
         }
 
+        // dragover erlauben und spalte markieren
         function erlaube(e) { e.preventDefault(); e.currentTarget.classList.add('drop-aktiv'); }
+
+        // markierung entfernen
         function verlasse(e) { e.currentTarget.classList.remove('drop-aktiv'); }
 
+        // drop: statuswechsel, aus "geschlossen" heraus nur per reopen mit nachricht
         async function ablegen(e) {
             e.preventDefault();
             e.currentTarget.classList.remove('drop-aktiv');
@@ -157,7 +161,6 @@
             const neuerStatus = parseInt(e.currentTarget.dataset.status);
             const alterStatus = STATUS_MAP[id];
 
-            // Aus "Geschlossen" heraus = Wiedereröffnen -> Pflicht-Nachricht.
             if (alterStatus === 2 && neuerStatus !== 2) {
                 const nachricht = prompt('Ticket wiedereröffnen – bitte eine Nachricht angeben:');
                 if (nachricht === null || nachricht.trim() === '') {
@@ -181,7 +184,7 @@
             try {
                 await api(`/api/ticket/${id}/status`, {
                     method: 'PATCH',
-                    body: JSON.stringify({ ticketId: parseInt(id), status: neuerStatus })
+                    body: JSON.stringify({ status: neuerStatus })
                 });
                 await boardLaden();
             } catch (err) {
@@ -190,6 +193,7 @@
             }
         }
 
+        // zur detailseite
         function oeffne(id) { window.location.href = `/ticket.html?id=${id}`; }
     </script>
 </body>

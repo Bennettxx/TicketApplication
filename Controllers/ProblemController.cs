@@ -8,8 +8,7 @@ using TicketApplication.Models;
 
 namespace TicketApplication.Controllers
 {
-    // Problemmeldungen (abgespeckte Tickets).
-    // Erstellen: anonym ODER eingeloggt. Bearbeiten/Ansehen: nur Admin.
+    // problemmeldungen: erstellen für jeden (auch anonym), verwaltung nur admin
     [Route("api/[controller]")]
     [ApiController]
     public class ProblemController : ControllerBase
@@ -21,12 +20,12 @@ namespace TicketApplication.Controllers
             _context = context;
         }
 
-        // POST /api/problem -> Neue Problemmeldung. Für JEDEN erlaubt (auch ohne Login).
+        // POST api/problem — neue meldung, login optional
         [HttpPost]
         [AllowAnonymous]
         public async Task<ActionResult<ProblemResponseDto>> Create(CreateProblemDto dto)
         {
-            // Falls ein gültiges Token mitgeschickt wurde, den Ersteller festhalten.
+            // bei gültigem token den ersteller festhalten
             int? createdBy = null;
             if (User?.Identity?.IsAuthenticated == true)
             {
@@ -52,10 +51,7 @@ namespace TicketApplication.Controllers
             return Ok(ToDto(problem));
         }
 
-        // GET /api/problem -> Liste (nur Admin), mit Suche/Filter.
-        //   q        Volltext in Titel/Beschreibung/E-Mail
-        //   status   0/1/2
-        //   priority 0/1/2
+        // GET api/problem — liste mit filtern (q, status, priority), nur admin
         [HttpGet]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<IEnumerable<ProblemResponseDto>>> GetAll(
@@ -81,7 +77,7 @@ namespace TicketApplication.Controllers
             return Ok(problems.Select(ToDto));
         }
 
-        // GET /api/problem/{id} -> Einzelnes Problem (nur Admin).
+        // GET api/problem/{id} — einzelnes problem, nur admin
         [HttpGet("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<ProblemResponseDto>> Get(int id)
@@ -91,7 +87,7 @@ namespace TicketApplication.Controllers
             return Ok(ToDto(problem));
         }
 
-        // PATCH /api/problem/{id}/status -> Status ändern (nur Admin).
+        // PATCH api/problem/{id}/status — status setzen, nur admin
         [HttpPatch("{id}/status")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateStatus(int id, UpdateProblemStatusDto dto)
@@ -107,7 +103,7 @@ namespace TicketApplication.Controllers
             return NoContent();
         }
 
-        // DELETE /api/problem/{id} -> Löschen (nur Admin).
+        // DELETE api/problem/{id} — löschen, nur admin
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
@@ -119,7 +115,7 @@ namespace TicketApplication.Controllers
             return NoContent();
         }
 
-        // ---- Mapping ----
+        // entity -> response-dto
         private static ProblemResponseDto ToDto(Problem p) => new()
         {
             Id = p.Id,

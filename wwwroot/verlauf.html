@@ -13,7 +13,7 @@
         <h1>Verlauf</h1>
         <p style="color:#555">Geschlossene Tickets. Öffne ein Ticket, um es (mit Nachricht) wiederzueröffnen.</p>
 
-        <!-- Such-/Filterleiste -->
+        <!-- such- und filterleiste -->
         <div class="karte" style="margin-bottom:16px;">
             <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
                 <div style="flex:2; min-width:200px;">
@@ -48,17 +48,20 @@
         let IST_STAFF = false;
         let filterTimer = null;
 
+        // seite aufbauen und laden
         (async function () {
             await seitenleisteAufbauen('verlauf');
             IST_STAFF = istStaff(await getMich());
             await laden();
         })();
 
+        // suche mit debounce
         function filterDebounce() { clearTimeout(filterTimer); filterTimer = setTimeout(laden, 350); }
 
+        // geschlossene tickets mit filtern laden
         async function laden() {
             const p = new URLSearchParams();
-            p.set('status', '2'); // nur geschlossene
+            p.set('status', '2');
             const q = document.getElementById('fSuche').value.trim();
             const prio = document.getElementById('fPrio').value;
             const von = document.getElementById('fVon').value;

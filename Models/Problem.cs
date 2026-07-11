@@ -2,10 +2,7 @@ using TicketApplication.Data;
 
 namespace TicketApplication.Models
 {
-    // Eine "Problemmeldung" – die abgespeckte Variante eines Tickets.
-    // Nur Titel, Beschreibung und Priorität; KEINE Abteilung/Subject/Anhänge.
-    // Erstellbar sowohl anonym (vor Login) als auch eingeloggt.
-    // Bearbeitet werden Probleme ausschließlich von Admins.
+    // problemmeldung, abgespeckte ticket-variante, auch anonym möglich
     public class Problem
     {
         public int Id { get; set; }
@@ -14,11 +11,10 @@ namespace TicketApplication.Models
         public TicketPriority Priority { get; set; } = TicketPriority.Low;
         public TicketStatus Status { get; set; } = TicketStatus.Open;
 
-        // Kontakt-E-Mail für Rückmeldung. Pflicht. Bei eingeloggten Nutzern wird
-        // sie im Frontend vorbefüllt, bleibt aber änderbar.
+        // pflicht, für rückmeldung
         public string ContactEmail { get; set; } = string.Empty;
 
-        // Ersteller, falls eingeloggt erstellt; null bei anonymer Meldung.
+        // null bei anonymer meldung
         public int? CreatedByUserId { get; set; }
 
         public DateTime CreatedAt { get; set; }

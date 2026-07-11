@@ -4,7 +4,7 @@ using TicketApplication.Models;
 
 namespace TicketApplication.DTOs
 {
-    // Eingangs-DTO zum Anlegen eines Wissensartikels (Admin/Support).
+    // eingang für neuen wissensartikel
     public class CreateKnowledgeArticleDto
     {
         [Required(ErrorMessage = "Titel ist erforderlich.")]
@@ -19,14 +19,13 @@ namespace TicketApplication.DTOs
         [MaxLength(5000, ErrorMessage = "Lösungstext darf maximal 5000 Zeichen lang sein.")]
         public string Solution { get; set; } = string.Empty;
 
-        // Optionale Zuordnung zu einer Abteilung (muss existieren, wenn gesetzt).
         [ExistsInColumn(typeof(Department), "Name", ErrorMessage = "Abteilung nicht gefunden.")]
         public string? DepartmentName { get; set; }
 
         public bool IsPublished { get; set; } = true;
     }
 
-    // Eingangs-DTO zum Ändern eines Artikels. Alle Felder optional.
+    // teilupdate eines artikels, alle felder optional
     public class UpdateKnowledgeArticleDto
     {
         [MinLength(3, ErrorMessage = "Titel muss mindestens 3 Zeichen lang sein.")]
@@ -45,7 +44,7 @@ namespace TicketApplication.DTOs
         public bool? IsPublished { get; set; }
     }
 
-    // Ausgangs-DTO für die Verwaltung (volle Daten).
+    // ausgang für die verwaltung
     public class KnowledgeArticleDto
     {
         public int Id { get; set; }
@@ -59,7 +58,7 @@ namespace TicketApplication.DTOs
         public DateTime UpdatedAt { get; set; }
     }
 
-    // Ausgangs-DTO für einen Vorschlag beim Ticket-Erstellen (kompakt).
+    // ausgang für lösungsvorschläge beim ticket-erstellen
     public class KnowledgeSuggestionDto
     {
         public int Id { get; set; }

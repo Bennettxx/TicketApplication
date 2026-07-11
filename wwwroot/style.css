@@ -1,6 +1,4 @@
-/* =====================================================================
-   style.css  -  Gemeinsames Layout für alle eingeloggten Seiten
-   ===================================================================== */
+/* style.css - gemeinsames layout für alle eingeloggten seiten */
 body {
     font-family: Arial, sans-serif;
     display: flex;

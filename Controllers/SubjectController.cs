@@ -6,10 +6,7 @@ using TicketApplication.DTOs;
 
 namespace TicketApplication.Controllers
 {
-    // Verwaltung der Themen (Subjects).
-    // Neue Themen entstehen unverifiziert beim Ticket-Erstellen; Support/Admin
-    // können sie verifizieren. Verifizierte Themen werden beim Ticket-Erstellen
-    // als Auswahl (Dropdown) angeboten.
+    // themenverwaltung; neue themen entstehen unverifiziert beim ticket-erstellen
     [Route("api/[controller]")]
     [ApiController]
     [Authorize(Roles = "Admin,Support")]
@@ -22,12 +19,12 @@ namespace TicketApplication.Controllers
             _context = context;
         }
 
-        // GET /api/subject -> alle Themen (für die Verwaltung), inkl. Abteilung.
+        // GET api/subject — alle themen, unverifizierte zuerst
         [HttpGet]
         public async Task<ActionResult<IEnumerable<SubjectDto>>> GetAll()
         {
             var list = await _context.Subjects
-                .OrderByDescending(s => s.IsVerified ? 0 : 1) // unverifizierte oben
+                .OrderByDescending(s => s.IsVerified ? 0 : 1)
                 .ThenBy(s => s.Title)
                 .Select(s => new SubjectDto
                 {
@@ -40,7 +37,7 @@ namespace TicketApplication.Controllers
             return Ok(list);
         }
 
-        // PATCH /api/subject/{id}/verify -> Thema verifizieren.
+        // PATCH api/subject/{id}/verify — thema verifizieren
         [HttpPatch("{id}/verify")]
         public async Task<IActionResult> Verify(int id)
         {
@@ -51,7 +48,7 @@ namespace TicketApplication.Controllers
             return NoContent();
         }
 
-        // PATCH /api/subject/{id}/unverify -> Verifizierung zurücknehmen.
+        // PATCH api/subject/{id}/unverify — verifizierung zurücknehmen
         [HttpPatch("{id}/unverify")]
         public async Task<IActionResult> Unverify(int id)
         {
@@ -62,7 +59,7 @@ namespace TicketApplication.Controllers
             return NoContent();
         }
 
-        // DELETE /api/subject/{id} -> Thema löschen (nur Admin).
+        // DELETE api/subject/{id} — thema löschen, nur admin
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)

@@ -72,7 +72,7 @@
     </div>
 
     <script>
-        // Abteilungen laden (öffentlicher Endpunkt, kein Login nötig).
+        // abteilungen laden, endpunkt ist ohne login erreichbar
         (async function () {
             try {
                 const res = await fetch('/api/metadata/departments');
@@ -84,9 +84,10 @@
                     o.value = a.name; o.textContent = a.name;
                     sel.appendChild(o);
                 });
-            } catch { /* ignore */ }
+            } catch { }
         })();
 
+        // registrierung absenden, danach zurück zum login
         async function registrieren() {
             const feedback = document.getElementById('feedback');
             const vorname = document.getElementById('vorname').value.trim();
@@ -129,7 +130,7 @@
                         if (body.errors) msg = Object.values(body.errors).flat().join(' ');
                         else if (typeof body === 'string') msg = body;
                         else if (body.title) msg = body.title;
-                    } catch { /* kein JSON */ }
+                    } catch { }
                     feedback.innerHTML = `<span style="color:red">${msg}</span>`;
                 }
             } catch (e) {

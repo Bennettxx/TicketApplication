@@ -1,13 +1,13 @@
 namespace TicketApplication.DTOs
 {
-    // Ausgangs-DTO für eine Abteilung (Auswahllisten im Frontend).
+    // ausgang für abteilungen (auswahllisten)
     public class DepartmentDto
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
     }
 
-    // Ausgangs-DTO für ein Subject/Thema.
+    // ausgang für themen
     public class SubjectDto
     {
         public int Id { get; set; }

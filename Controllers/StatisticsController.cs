@@ -6,9 +6,7 @@ using TicketApplication.DTOs;
 
 namespace TicketApplication.Controllers
 {
-    // Statistische Auswertungen – nur für Admins.
-    // Beantwortet: Wer hat wie viele Tickets bearbeitet? Welcher Kunde hat
-    // wie viel Bearbeitungszeit verursacht?
+    // auswertungen für die statistik-seite, nur admin
     [Route("api/[controller]")]
     [ApiController]
     [Authorize(Roles = "Admin")]
@@ -21,33 +19,28 @@ namespace TicketApplication.Controllers
             _context = context;
         }
 
-        // GET /api/statistics/agents
-        // Pro Bearbeiter (Admin/Support): zugewiesene Tickets, geschlossene
-        // Tickets und insgesamt erfasste Arbeitszeit (Minuten).
+        // GET api/statistics/agents — pro bearbeiter: zugewiesen, geschlossen, erfasste minuten
         [HttpGet("agents")]
         public async Task<ActionResult<IEnumerable<AgentStatsDto>>> Agents()
         {
-            // Erfasste Minuten je Bearbeiter (aus der Zeiterfassung).
             var minutesByUser = await _context.TicketTimeEntries
                 .GroupBy(e => e.UserId)
                 .Select(g => new { UserId = g.Key, Minutes = g.Sum(x => x.Minutes) })
                 .ToDictionaryAsync(x => x.UserId, x => x.Minutes);
 
-            // Zugewiesene Tickets (alle, unabhängig vom Status).
             var assignedByUser = await _context.Tickets
                 .Where(t => t.AssignedToId != null)
                 .GroupBy(t => t.AssignedToId!.Value)
                 .Select(g => new { UserId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.UserId, x => x.Count);
 
-            // Geschlossene Tickets je zugewiesenem Bearbeiter.
             var closedByUser = await _context.Tickets
                 .Where(t => t.AssignedToId != null && t.Status == TicketStatus.Closed)
                 .GroupBy(t => t.AssignedToId!.Value)
                 .Select(g => new { UserId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.UserId, x => x.Count);
 
-            // Alle Mitarbeiter (Staff) als Basis, auch wenn sie 0 Tickets haben.
+            // alle staff-user als basis, auch ohne tickets
             var staff = await _context.Users
                 .Where(u => u.IsActive && (u.Role == UserRole.Admin || u.Role == UserRole.Support))
                 .Select(u => new { u.Id, u.FirstName, u.SecondName, u.Email, u.Role })
@@ -69,13 +62,10 @@ namespace TicketApplication.Controllers
             return Ok(result);
         }
 
-        // GET /api/statistics/customers
-        // Pro Kunde: Anzahl erstellter Tickets, davon offen, und die gesamte
-        // Bearbeitungszeit aller seiner Tickets (Summe der Zeiteinträge).
+        // GET api/statistics/customers — pro kunde: tickets, davon offen, verursachte minuten
         [HttpGet("customers")]
         public async Task<ActionResult<IEnumerable<CustomerStatsDto>>> Customers()
         {
-            // Tickets je Kunde (Ersteller).
             var ticketsByCustomer = await _context.Tickets
                 .GroupBy(t => t.CreatedByUserId)
                 .Select(g => new
@@ -86,9 +76,7 @@ namespace TicketApplication.Controllers
                 })
                 .ToListAsync();
 
-            // Bearbeitungszeit je Kunde = Summe der Zeiteinträge über alle
-            // Tickets, die der Kunde erstellt hat. Wir verknüpfen Zeiteinträge
-            // mit dem Ersteller des jeweiligen Tickets.
+            // minuten je kunde = zeiteinträge über alle seine tickets
             var minutesByCustomer = await (from e in _context.TicketTimeEntries
                                            join t in _context.Tickets on e.TicketId equals t.Id
                                            group e by t.CreatedByUserId into g
@@ -124,15 +112,11 @@ namespace TicketApplication.Controllers
             return Ok(result);
         }
 
-        // GET /api/statistics/departments
-        // Kategorisiert die Bearbeitungszeit nach der Abteilung des Erstellers
-        // (Kunden). Antwort: pro Abteilung Anzahl Benutzer, erstellte Tickets,
-        // davon offen und gesamte Bearbeitungszeit.
+        // GET api/statistics/departments — bearbeitungszeit nach abteilung des erstellers
         [HttpGet("departments")]
         public async Task<ActionResult<IEnumerable<DepartmentStatsDto>>> Departments()
         {
-            // Stammdaten laden (Datenmengen sind überschaubar -> im Speicher
-            // aggregieren ist robust und gut lesbar).
+            // datenmengen klein, aggregation im speicher
             var departments = await _context.Departments
                 .Select(d => new { d.Id, d.Name })
                 .ToListAsync();
@@ -146,17 +130,12 @@ namespace TicketApplication.Controllers
                 .Select(e => new { e.TicketId, e.Minutes })
                 .ToListAsync();
 
-            // Zuordnungen
             var userDept = users.ToDictionary(u => u.Id, u => u.DepartmentId);
             var ticketDept = tickets.ToDictionary(
                 t => t.Id,
                 t => userDept.TryGetValue(t.CreatedByUserId, out var dep) ? dep : (int?)null);
 
-            // Aggregation je Abteilung.
-            // WICHTIG: Ein Dictionary erlaubt KEINEN null-Schlüssel (auch nicht
-            // bei Schlüsseltyp int?). Deshalb wird "ohne Abteilung" (z.B.
-            // Admin/Support ohne Abteilung) in einem SEPARATEN Bucket gehalten,
-            // und das Dictionary verwendet nur echte (nicht-null) Abteilungs-Ids.
+            // "ohne abteilung" als eigener bucket, dictionary kann keinen null-key
             var stats = new Dictionary<int, DepartmentStatsDto>();
             var ohneAbteilung = new DepartmentStatsDto
             {
@@ -181,7 +160,7 @@ namespace TicketApplication.Controllers
                 return s;
             }
 
-            // Alle Abteilungen vorab anlegen (auch ohne Tickets/User).
+            // alle abteilungen anlegen, auch leere
             foreach (var d in departments) Bucket(d.Id);
 
             foreach (var u in users) Bucket(u.DepartmentId).UserCount++;
@@ -199,7 +178,7 @@ namespace TicketApplication.Controllers
                 Bucket(dep).TotalMinutes += e.Minutes;
             }
 
-            // Ergebnis: echte Abteilungen + ("ohne Abteilung" nur wenn dort etwas anfällt).
+            // "ohne abteilung" nur ausgeben wenn dort etwas anfällt
             var result = stats.Values.ToList();
             if (ohneAbteilung.UserCount > 0 || ohneAbteilung.TicketCount > 0 || ohneAbteilung.TotalMinutes > 0)
                 result.Add(ohneAbteilung);

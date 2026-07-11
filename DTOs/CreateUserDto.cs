@@ -1,10 +1,11 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using TicketApplication.Data;
 using TicketApplication.Functions;
 using TicketApplication.Models;
 
 namespace TicketApplication.DTOs
 {
+    // eingang für user-anlage durch den admin
     public class CreateUserDto
     {
         [Required]
@@ -26,7 +27,7 @@ namespace TicketApplication.DTOs
 
         public UserRole Role { get; set; } = UserRole.User;
 
-        // Optionale Abteilung (muss existieren, wenn gesetzt).
+        // optional, muss existieren wenn gesetzt
         [ExistsInColumn(typeof(Department), "Name", ErrorMessage = "Abteilung nicht gefunden.")]
         public string? DepartmentName { get; set; }
     }

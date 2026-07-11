@@ -1,9 +1,11 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.Linq.Expressions;
 using TicketApplication.Data;
 
 namespace TicketApplication.Functions
 {
+    // validierung: wert muss in der angegebenen tabelle/spalte existieren
+    // null/leer gilt als "nicht gesetzt" und geht durch, pflicht regelt [Required]
     public class ExistsInColumnAttribute : ValidationAttribute
     {
         private readonly Type _entityType;
@@ -17,17 +19,12 @@ namespace TicketApplication.Functions
 
         protected override ValidationResult? IsValid(object? value, ValidationContext context)
         {
-            // null wird durchgelassen: Optionale Felder (z.B. ein nicht
-            // angegebener Zusatz-Kontakt) sind erlaubt. Ob ein Wert PFLICHT ist,
-            // entscheidet ausschließlich [Required] – nicht dieses Attribut.
-            // Leere/Whitespace-Strings gelten ebenfalls als "nicht gesetzt".
             if (value == null || (value is string s && string.IsNullOrWhiteSpace(s)))
                 return ValidationResult.Success;
 
             var db = context.GetRequiredService<ApplicationDbContext>();
 
-            // Dynamisch in beliebiger Spalte suchen
-            var entity = db.Model.FindEntityType(_entityType);
+            // dynamische any-abfrage auf beliebige spalte bauen
             var dbSet = (IQueryable)db.GetType()
                 .GetMethod("Set", Type.EmptyTypes)!
                 .MakeGenericMethod(_entityType)

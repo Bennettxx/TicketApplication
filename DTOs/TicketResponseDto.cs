@@ -1,5 +1,6 @@
-﻿namespace TicketApplication.DTOs
+namespace TicketApplication.DTOs
 {
+    // ausgang für tickets, angereichert mit namen/mails/minuten
     public class TicketResponseDto
     {
         public int Id { get; set; }
@@ -7,10 +8,10 @@
         public string Description { get; set; } = string.Empty;
         public string ExpectedResult { get; set; } = string.Empty;
         public string ActualResult { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;     // Enum -> lesbarer String
-        public int StatusCode { get; set; }                    // Enum-Zahl (fürs Kanban-Board)
-        public string Priority { get; set; } = string.Empty;   // Enum -> lesbarer String
-        public int PriorityCode { get; set; }                  // Enum-Zahl (zum Sortieren/Farbe)
+        public string Status { get; set; } = string.Empty;
+        public int StatusCode { get; set; } // enum-zahl fürs kanban
+        public string Priority { get; set; } = string.Empty;
+        public int PriorityCode { get; set; } // enum-zahl für sortierung/farbe
 
         public int CreatedByUserId { get; set; }
         public string CreatedByEmail { get; set; } = string.Empty;
@@ -22,11 +23,14 @@
         public int SubjectId { get; set; }
         public string SubjectName { get; set; } = string.Empty;
 
-        // Summe aller erfassten Bearbeitungsminuten dieses Tickets.
+        // optionaler verweis auf anderes ticket
+        public int? ReferenceTicketId { get; set; }
+        public string ReferenceComment { get; set; } = string.Empty;
+
+        // summe der erfassten minuten
         public int TotalMinutes { get; set; }
 
-        // true, wenn es für den aktuellen Nutzer eine ungelesene fremde Antwort
-        // gibt (für die Kennzeichnung auf Startseite/Dashboard).
+        // true wenn ungelesene fremde antwort vorliegt
         public bool HasUnreadReply { get; set; }
 
         public DateTime CreatedAt { get; set; }

@@ -1,29 +1,26 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <title>Ticket System Login</title>
     <style>
-        /*Hintergrund*/
         body {
-            font-family: Arial; /*Schriftart für die  Seite*/
-            display: flex; /* mact unsere box flexibel*/
-            justify-content: center; /*Zentriert Login Fenster*/
+            font-family: Arial;
+            display: flex;
+            justify-content: center;
             min-height: 100vh;
             margin: 0;
-            /* Farbverlauf als Hintergrund */
             background: linear-gradient(135deg, #2c3e50 0%, #1abc9c 100%);
         }
-        /*Unsere wiße box*/
         .box {
             background: white;
-            padding: 50px 55px; /*Abstand zu unseren eingabefeldern*/
-            border-radius: 15px; /* damit macht man die Ecken rund*/
-            box-shadow: 0 8px 30px rgba(0,0,0,0.25); /*Schatten*/
-            margin-top: 100px; /*Abstand des fensters vom oberen Rand*/
+            padding: 50px 55px;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+            margin-top: 100px;
             height: fit-content;
             width: 300px;
         }
-        /* Logo oben in der Box. Datei bitte als wwwroot/logo.png ablegen. */
+        /* logo-datei als wwwroot/logo.png ablegen */
         .logo {
             display: block;
             max-width: 160px;
@@ -32,21 +29,21 @@
         }
 
         input {
-            display: block; /*macht dass Felder untereinander stehen*/
-            width: 100%; /*nutzt die gesamte Breite der weißen Box*/
-            margin: 10px 0; /*Abstand nach oben/unten*/
-            padding: 10px; /*Größe*/
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
         }
 
         button {
             width: 100%;
-            padding: 11px; /*Dicke*/
+            padding: 11px;
             margin-top: 6px;
             background: #28a745;
-            color: white; /*Schriftfarbe auf dem button*/
+            color: white;
             border: none;
             border-radius: 6px;
-            cursor: pointer; /*Zeigt eine Hand Mausanzeiger*/
+            cursor: pointer;
         }
         input {
             border: 1px solid #ccc;
@@ -58,7 +55,7 @@
 <body>
 
     <div class="box">
-        <!-- Logo: wird angezeigt, sobald wwwroot/logo.png existiert; sonst ausgeblendet -->
+        <!-- logo wird ausgeblendet wenn die datei fehlt -->
         <img src="/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'">
         <h1 style="text-align:center; color:#2c3e50; margin-top:0;">Login</h1>
 
@@ -76,13 +73,13 @@
     </div>
 
     <script>
+    // login: token holen, speichern, weiter zur startseite
     async function anmelden() {
         const email = document.getElementById('emailInput').value;
         const pass = document.getElementById('passInput').value;
         const feedback = document.getElementById('feedback');
 
         try {
-            //
             const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -95,7 +92,7 @@
                 localStorage.setItem('meinToken', daten.token);
                 window.location.href = '/startseite.html';
             } else {
-                // Servermeldung anzeigen (z.B. "abgelehnt", "noch nicht freigeschaltet").
+                // servermeldung anzeigen (z.B. "abgelehnt", "noch nicht freigeschaltet")
                 let msg = 'Login fehlgeschlagen.';
                 try {
                     const body = await response.json();

@@ -14,7 +14,7 @@
         <p style="color:#555">Eingegangene Problemmeldungen (auch anonyme). Nur Admins sehen und bearbeiten sie.</p>
         <p id="feedback" class="mini"></p>
 
-        <!-- Such-/Filterleiste -->
+        <!-- such- und filterleiste -->
         <div class="karte" style="margin-bottom:16px;">
             <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
                 <div style="flex:2; min-width:200px;">
@@ -49,6 +49,7 @@
     <script>
         let filterTimer = null;
 
+        // seite aufbauen, nur admin
         (async function () {
             await seitenleisteAufbauen('probleme');
             const mich = await getMich();
@@ -59,8 +60,10 @@
             await laden();
         })();
 
+        // suche mit debounce
         function filterDebounce() { clearTimeout(filterTimer); filterTimer = setTimeout(laden, 350); }
 
+        // meldungen mit filtern laden und rendern
         async function laden() {
             const p = new URLSearchParams();
             const q = document.getElementById('fSuche').value.trim();
@@ -102,6 +105,7 @@
             }
         }
 
+        // status einer meldung setzen
         async function statusAendern(id, status) {
             try {
                 await api(`/api/problem/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: parseInt(status) }) });
@@ -109,6 +113,7 @@
             } catch (e) { document.getElementById('feedback').textContent = e.message; }
         }
 
+        // meldung löschen
         async function loeschen(id) {
             if (!confirm('Meldung wirklich löschen?')) return;
             try {

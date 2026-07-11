@@ -1,7 +1,8 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace TicketApplication.Functions
 {
+    // validierung: wenn dieses feld gesetzt ist, muss auch das angegebene andere feld gesetzt sein
     [AttributeUsage(AttributeTargets.Property, AllowMultiple = true)]
     public class RequiresFieldAttribute : ValidationAttribute
     {

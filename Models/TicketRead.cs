@@ -1,8 +1,6 @@
 namespace TicketApplication.Models
 {
-    // Merkt sich, wann ein Benutzer ein Ticket zuletzt angesehen hat.
-    // Grundlage für die Benachrichtigung "neue Antwort erhalten": Gibt es eine
-    // fremde Nachricht, die neuer ist als dieser Zeitpunkt, gilt sie als ungelesen.
+    // letzter lesezeitpunkt pro user und ticket, basis für "neue antwort"-markierung
     public class TicketRead
     {
         public int Id { get; set; }

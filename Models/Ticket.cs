@@ -1,16 +1,16 @@
-﻿using TicketApplication.Data;
+using TicketApplication.Data;
 
 namespace TicketApplication.Models
 {
     public class Ticket
     {
-        // Basisinformationen
-        public int Id { get; set; } // Primärschlüssel
-        public int TicketId { get; set; }
+        public int Id { get; set; }
         public int CreatedByUserId { get; set; }
-        // Nur durch Support/Admin änderbar
+
+        // zuweisung nur durch support/admin
         public int? AssignedToId { get; set; }
-        // Nachträglich unveränderlicher Ticketinhalt
+
+        // inhalt, nach erstellung fix
         public TicketPriority Priority { get; set; } = TicketPriority.Low;
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
@@ -19,21 +19,22 @@ namespace TicketApplication.Models
         public bool AgreedBilling { get; set; } = false;
         public bool AgreedAGB { get; set; } = false;
 
+        // optionaler verweis auf ein anderes ticket
+        public int? ReferenceTicketId { get; set; }
+        public string ReferenceComment { get; set; } = string.Empty;
 
-        // Nachträglich veränderlicher Ticketinhalt
+        // nachträglich änderbar
         public TicketStatus Status { get; set; } = TicketStatus.Open;
         public int? AdditionalUserId1 { get; set; }
         public int? AdditionalUserId2 { get; set; }
         public int? AdditionalUserId3 { get; set; }
-        public int DepartmentId { get; set; } // Nachträglich nicht durch User änderbar
-        public int SubjectId { get; set; } // Nachträglich nicht durch User änderbar
+        public int DepartmentId { get; set; }
+        public int SubjectId { get; set; }
 
-
-        // Autom. angepasste Werte
+        // zeitstempel, werden automatisch gesetzt
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public DateTime? ClosedAt { get; set; }
         public DateTime? OpenedAt { get; set; }
-
     }
 }

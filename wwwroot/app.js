@@ -1,29 +1,17 @@
-// =====================================================================
-// app.js  -  Gemeinsame Frontend-Logik für alle Seiten
-// ---------------------------------------------------------------------
-// Enthält: Token-Handling, ein fetch-Wrapper mit Auth-Header,
-// das Laden des eigenen Profils und den Aufbau der Seitenleiste
-// (rollenabhängig: Kanban/Statistik nur für Admin/Support).
-// =====================================================================
+// app.js - gemeinsame logik: token, api-wrapper, profil-cache, sidebar
 
-// Token aus dem LocalStorage. Wird beim Login gesetzt.
+// token aus dem localstorage, wird beim login gesetzt
 const TOKEN = localStorage.getItem('meinToken');
 
-// Auf Seiten, die einen Login erfordern, gleich zum Login umleiten.
-// (Die Login-Seite selbst bindet app.js nicht ein.)
+// ohne token direkt zum login (login-seite bindet app.js nicht ein)
 if (!TOKEN) {
     window.location.href = '/index.html';
 }
 
-// Zwischengespeichertes eigenes Profil, damit wir es nicht mehrfach laden.
+// eigenes profil, gecached
 let MICH = null;
 
-// ---------------------------------------------------------------------
-// api(path, options)
-// Kleiner fetch-Wrapper: hängt den Authorization-Header an, setzt
-// JSON-Content-Type und wirft bei Fehlern eine aussagekräftige Exception.
-// Gibt das geparste JSON zurück (oder null bei 204 No Content).
-// ---------------------------------------------------------------------
+// fetch-wrapper: auth-header + json, wirft bei fehlern, gibt json oder null (204) zurück
 async function api(path, options = {}) {
     const opts = Object.assign({ method: 'GET' }, options);
     opts.headers = Object.assign({
@@ -33,7 +21,7 @@ async function api(path, options = {}) {
 
     const res = await fetch(path, opts);
 
-    // Token abgelaufen/ungültig -> zurück zum Login.
+    // token abgelaufen -> login
     if (res.status === 401) {
         localStorage.removeItem('meinToken');
         window.location.href = '/index.html';
@@ -44,7 +32,7 @@ async function api(path, options = {}) {
         let msg = `Fehler ${res.status}`;
         try {
             const body = await res.json();
-            // ASP.NET Validierungsfehler kommen als { errors: { Feld: [..] } }.
+            // asp.net validierungsfehler kommen als { errors: { feld: [..] } }
             if (body.errors) {
                 msg = Object.values(body.errors).flat().join(' ');
             } else if (typeof body === 'string') {
@@ -52,7 +40,7 @@ async function api(path, options = {}) {
             } else if (body.title) {
                 msg = body.title;
             }
-        } catch { /* kein JSON-Body */ }
+        } catch { }
         throw new Error(msg);
     }
 
@@ -61,55 +49,45 @@ async function api(path, options = {}) {
     return text ? JSON.parse(text) : null;
 }
 
-// Eigenes Profil laden (gecached).
+// eigenes profil laden, gecached
 async function getMich() {
     if (MICH) return MICH;
     MICH = await api('/api/user/me');
     return MICH;
 }
 
-// Ist der aktuelle User Admin oder Support?
+// admin oder support?
 function istStaff(mich) {
     return mich && (mich.role === 'Admin' || mich.role === 'Support');
 }
 
-// Abmelden: Token löschen, zurück zum Login.
+// token löschen, zurück zum login
 function abmelden() {
     localStorage.removeItem('meinToken');
     window.location.href = '/index.html';
 }
 
-// Klappt eine Navigationsgruppe auf/zu (Dropdown-Verhalten der Sidebar).
+// sidebar-gruppe auf/zuklappen
 function navToggle(kopf) {
     kopf.parentElement.classList.toggle('offen');
 }
 
-// ---------------------------------------------------------------------
-// seitenleisteAufbauen(aktiv)
-// Baut die linke Navigationsleiste als Dropdown-Menü in #sidebar.
-// Die Funktionen sind in aufklappbare Gruppen unterteilt; die Gruppe mit
-// dem aktiven Punkt ist beim Laden geöffnet.
-// Kanban/Statistik/Benutzer erscheinen nur für Staff bzw. Admin.
-// ---------------------------------------------------------------------
+// sidebar rollenabhängig aufbauen, gruppe mit aktivem punkt ist offen
 async function seitenleisteAufbauen(aktiv) {
     const mich = await getMich();
     const staff = istStaff(mich);
     const admin = mich.role === 'Admin';
-    const isUser = mich.role === 'User'; // nur normale User dürfen Tickets erstellen
+    const isUser = mich.role === 'User';
 
-    // Eigenständiger Top-Link "Startseite" (kein Dropdown).
     const startLink =
         `<a href="/dashboard.html" class="nav-top ${aktiv === 'dashboard' ? 'aktiv' : ''}">Startseite</a>`;
 
-    // Menü in Gruppen (Dropdowns) organisiert.
     const gruppen = [
         {
             titel: 'Tickets', sichtbar: true, punkte: [
                 { key: 'tickets', label: 'Offene Tickets', href: '/startseite.html', sichtbar: true },
                 { key: 'verlauf', label: 'Verlauf', href: '/verlauf.html', sichtbar: true },
-                // Ticket erstellen nur für die Rolle User.
                 { key: 'erstellen', label: 'Ticket erstellen', href: '/TicketErstellen.html', sichtbar: isUser },
-                // Problem melden dürfen alle (funktioniert auch anonym).
                 { key: 'problem', label: 'Problem melden', href: '/problemMelden.html', sichtbar: true }
             ]
         },
@@ -162,7 +140,7 @@ async function seitenleisteAufbauen(aktiv) {
         `;
     }
 
-    // Benutzername oben rechts (falls Element vorhanden).
+    // benutzername oben rechts
     const benutzer = document.getElementById('benutzername');
     if (benutzer) {
         const name = (mich.firstName || mich.secondName)
@@ -172,7 +150,7 @@ async function seitenleisteAufbauen(aktiv) {
     }
 }
 
-// HTML-Escaping gegen versehentliches Einschleusen von Markup.
+// html-escaping gegen eingeschleustes markup
 function esc(s) {
     if (s === null || s === undefined) return '';
     return String(s)
@@ -182,7 +160,7 @@ function esc(s) {
         .replaceAll('"', '&quot;');
 }
 
-// Minuten -> "1h 30m" lesbar machen.
+// minuten -> "1h 30m"
 function minutenFormat(min) {
     min = min || 0;
     const h = Math.floor(min / 60);
@@ -191,7 +169,7 @@ function minutenFormat(min) {
     return `${m}m`;
 }
 
-// Status-Code -> Text/Farbe (passend zum TicketStatus-Enum im Backend).
+// mapping status/prio-code -> text und farbe, passend zu den backend-enums
 const STATUS_TEXT = { 0: 'Offen', 1: 'In Bearbeitung', 2: 'Geschlossen' };
 const STATUS_FARBE = { 0: '#6c757d', 1: '#ffc107', 2: '#28a745' };
 const PRIO_TEXT = { 0: 'Low', 1: 'Medium', 2: 'High' };

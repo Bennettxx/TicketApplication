@@ -8,7 +8,7 @@ using TicketApplication.Models;
 
 namespace TicketApplication.Controllers
 {
-    // Liefert die Kennzahlen für das Dashboard.
+    // kennzahlen fürs dashboard, rollenabhängig
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
@@ -21,6 +21,7 @@ namespace TicketApplication.Controllers
             _context = context;
         }
 
+        // GET api/dashboard — zähler + letzte tickets; staff systemweit, user nur eigene
         [HttpGet]
         public async Task<ActionResult<DashboardDto>> Get()
         {
@@ -28,7 +29,6 @@ namespace TicketApplication.Controllers
             var role = User.FindFirstValue(ClaimTypes.Role) ?? "User";
             var isStaff = role == "Admin" || role == "Support";
 
-            // Sichtbarer Grundbestand: Staff alle, User nur eigene.
             IQueryable<Ticket> basis = _context.Tickets;
             if (!isStaff)
                 basis = basis.Where(t => t.CreatedByUserId == userId);
@@ -51,7 +51,7 @@ namespace TicketApplication.Controllers
                     .CountAsync(t => t.AssignedToId == null && t.Status != TicketStatus.Closed);
             }
 
-            // Ungelesene fremde Antworten (Ersteller ODER Bearbeiter).
+            // tickets mit ungelesener fremder antwort (als ersteller oder bearbeiter)
             dto.UnreadReplyCount = await _context.Tickets
                 .Where(t => t.CreatedByUserId == userId || t.AssignedToId == userId)
                 .CountAsync(t => _context.TicketDialogue.Any(d =>

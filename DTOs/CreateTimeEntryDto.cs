@@ -3,13 +3,10 @@ using TicketApplication.Functions;
 
 namespace TicketApplication.DTOs
 {
-    // Eingangs-DTO für einen manuellen Zeiteintrag (Zeiterfassung).
-    // Eintrittstor: Minuten müssen sinnvoll sein, das Datum nicht in der Zukunft.
+    // eingang für einen zeiteintrag
     public class CreateTimeEntryDto
     {
         [Required(ErrorMessage = "Minuten sind erforderlich.")]
-        // 1 Minute bis 1440 Minuten (= 24 Stunden) pro einzelnem Eintrag.
-        // Verhindert 0/negative Werte und unrealistische Ausreißer.
         [Range(1, 1440, ErrorMessage = "Minuten müssen zwischen 1 und 1440 (24h) liegen.")]
         public int Minutes { get; set; }
 

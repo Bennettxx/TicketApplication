@@ -1,7 +1,8 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace TicketApplication.DTOs
 {
+    // eingang für passwortwechsel im eigenen profil
     public class ChangePasswordDto
     {
         [Required(ErrorMessage = "Altes Passwort ist erforderlich.")]

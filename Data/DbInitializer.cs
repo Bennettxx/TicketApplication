@@ -1,24 +1,16 @@
-﻿using TicketApplication.Models;
-using Microsoft.EntityFrameworkCore;
+using TicketApplication.Models;
 
 namespace TicketApplication.Data
 {
-    // Diese Klasse wird in Program.cs aufgerufen, um die DB zu initialisieren
-    // Schritt 1: Prüfen ob DB da ist und Tabellen laut Schema anlegen
-    //            Das Schema ergibt sich aus den DbSet-Variablen in ApplicationDbContext.cs
-    // Schritt 2: Prüfen ob bestimmte Tabellen leer sind und Default-Daten
-    //            anlegen (z.B. Standard-Admin-User).
+    // legt db + tabellen an und spielt startdaten ein
+    // achtung: EnsureCreated migriert nicht — bei model-änderungen lokale db löschen
     public class DbInitializer
     {
         public static void Initialize(ApplicationDbContext context)
         {
-            // Legt die DB inkl. aller Tabellen an, falls sie noch nicht existiert.
-            // Bei bestehenden DBs passiert nichts — Schema-Änderungen werden NICHT automatisch eingespielt.
-            // Wenn das Model erweitert wird, muss die lokale DB einmal gelöscht werden.
             context.Database.EnsureCreated();
 
-            // ZUERST Abteilungen anlegen, damit die Benutzer ihnen direkt
-            // zugeordnet werden können.
+            // abteilungen zuerst, user brauchen sie
             if (!context.Departments.Any())
             {
                 string[] departmentNames = { "IT Support", "Einkauf", "Verkauf" };
@@ -29,15 +21,11 @@ namespace TicketApplication.Data
                 context.SaveChanges();
             }
 
-            // Standard-Benutzer für die lokale Entwicklung. Alle mit dem
-            // Passwort "Password". In Produktion natürlich ändern!
-            //   admin@user.com    -> Admin   (alle Rechte, Statistik)
-            //   support@user.com  -> Support (Tickets bearbeiten, Kanban)
-            //   kunde@user.com    -> User    (eigene Tickets erstellen)
+            // dev-standarduser, passwort jeweils "Password"
+            // admin@user.com / support@user.com / user@user.com
             if (!context.Users.Any())
             {
-                // Abteilungs-Id für den Kunden auflösen.
-                // Admin/Support bekommen KEINE Abteilung (DepartmentId = null).
+                // nur die rolle user bekommt eine abteilung
                 int? einkaufDep = context.Departments.Where(d => d.Name == "Einkauf").Select(d => (int?)d.Id).FirstOrDefault();
 
                 context.Users.AddRange(
@@ -77,7 +65,7 @@ namespace TicketApplication.Data
                 context.SaveChanges();
             }
 
-            // Beispiel-Wissensartikel für die Lösungsvorschläge.
+            // beispiel-wissensartikel
             if (!context.KnowledgeArticles.Any())
             {
                 context.KnowledgeArticles.AddRange(

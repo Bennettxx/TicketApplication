@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Statistik</title>
     <link rel="stylesheet" href="/style.css">
-    <!-- Chart.js via CDN (benötigt Internetzugang beim Laden der Seite) -->
+    <!-- chart.js vom cdn, braucht internet beim laden -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <style>
         .diagramme { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -48,6 +48,7 @@
 
     <script src="/app.js"></script>
     <script>
+        // seite aufbauen, nur admin
         (async function () {
             await seitenleisteAufbauen('statistik');
             const mich = await getMich();
@@ -62,9 +63,9 @@
             await diagrammeLaden();
         })();
 
-        // Diagramme mit Chart.js rendern.
+        // drei diagramme mit chart.js rendern
         async function diagrammeLaden() {
-            if (typeof Chart === 'undefined') return; // CDN nicht geladen (offline)
+            if (typeof Chart === 'undefined') return; // cdn nicht geladen (offline)
             try {
                 const [abt, agents, dash] = await Promise.all([
                     api('/api/statistics/departments'),
@@ -106,9 +107,10 @@
             }
         }
 
-        // Hilfsfunktion: maximale Minuten für Balken-Skalierung.
+        // maximale minuten für die balken-skalierung
         function maxMin(arr) { return Math.max(1, ...arr.map(x => x.totalMinutes)); }
 
+        // abteilungsstatistik als tabelle
         async function abteilungenLaden() {
             try {
                 const abt = await api('/api/statistics/departments');
@@ -137,6 +139,7 @@
             }
         }
 
+        // bearbeiterstatistik als tabelle
         async function agentsLaden() {
             try {
                 const agents = await api('/api/statistics/agents');
@@ -165,6 +168,7 @@
             }
         }
 
+        // kundenstatistik als tabelle
         async function kundenLaden() {
             try {
                 const kunden = await api('/api/statistics/customers');

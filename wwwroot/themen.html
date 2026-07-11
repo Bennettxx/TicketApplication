@@ -14,7 +14,7 @@
         <p style="color:#555">Beim Ticket-Erstellen entstehen neue Themen unverifiziert. Verifizierte Themen werden dort als Auswahl angeboten.</p>
         <p id="feedback" class="mini"></p>
 
-        <!-- Such-/Filterleiste -->
+        <!-- such- und filterleiste -->
         <div class="karte" style="margin-bottom:16px;">
             <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
                 <div style="flex:2; min-width:200px;">
@@ -42,13 +42,13 @@
     <script src="/app.js"></script>
     <script>
         let SUBJECTS = [];
-        let DEPTMAP = {};   // id -> name
-        let MICH = null;
+        let DEPTMAP = {}; // abteilungs-id -> name
 
+        // seite aufbauen, nur staff
         (async function () {
             await seitenleisteAufbauen('themen');
-            MICH = await getMich();
-            if (!istStaff(MICH)) {
+            const mich = await getMich();
+            if (!istStaff(mich)) {
                 document.querySelector('.main').innerHTML = '<p class="feedback-rot">Kein Zugriff. Nur Admin/Support.</p>';
                 return;
             }
@@ -56,6 +56,7 @@
             await laden();
         })();
 
+        // abteilungen ins filter-dropdown laden
         async function abteilungenLaden() {
             try {
                 const abt = await api('/api/metadata/departments');
@@ -66,9 +67,10 @@
                     o.value = a.id; o.textContent = a.name;
                     sel.appendChild(o);
                 });
-            } catch { /* ignore */ }
+            } catch { }
         }
 
+        // themen laden
         async function laden() {
             try {
                 SUBJECTS = await api('/api/subject');
@@ -78,6 +80,7 @@
             }
         }
 
+        // tabelle nach filtern rendern
         function rendern() {
             const q = document.getElementById('fSuche').value.trim().toLowerCase();
             const status = document.getElementById('fStatus').value;
@@ -115,6 +118,7 @@
                 </table>`;
         }
 
+        // verifizieren oder zurücknehmen
         async function setVerify(id, verify) {
             try {
                 await api(`/api/subject/${id}/${verify ? 'verify' : 'unverify'}`, { method: 'PATCH' });
@@ -122,6 +126,7 @@
             } catch (e) { document.getElementById('feedback').textContent = e.message; }
         }
 
+        // thema löschen, nur admin
         async function loeschen(id) {
             if (!confirm('Thema wirklich löschen?')) return;
             try {

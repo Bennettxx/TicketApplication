@@ -9,18 +9,14 @@ using TicketApplication.Models;
 
 namespace TicketApplication.Controllers
 {
-    // Datei-Anhänge eines Tickets.
-    // Route: api/ticket/{ticketId}/attachments
-    //
-    // Speicherung:
-    //   - privat  -> AES-GCM-verschlüsselt in der DB
-    //   - öffentl. -> als Datei im Projekt-Unterordner "AttachmentStorage"
+    // datei-anhänge, route api/ticket/{ticketId}/attachments
+    // privat -> aes-gcm-verschlüsselt in der db, sonst datei im ordner AttachmentStorage
     [Route("api/ticket/{ticketId}/attachments")]
     [ApiController]
     [Authorize]
     public class AttachmentController : ControllerBase
     {
-        private const long MaxBytes = 5 * 1024 * 1024; // 5 MB
+        private const long MaxBytes = 5 * 1024 * 1024; // 5 mb
         private const string StorageFolder = "AttachmentStorage";
 
         private readonly ApplicationDbContext _context;
@@ -43,7 +39,7 @@ namespace TicketApplication.Controllers
         private byte[] EncryptionKey =>
             Convert.FromBase64String(_config["Attachments:Key"]!);
 
-        // Prüft, ob der aktuelle User dieses Ticket sehen darf.
+        // darf der aktuelle user das ticket sehen?
         private async Task<bool> DarfTicketSehen(int ticketId)
         {
             var ticket = await _context.Tickets.FindAsync(ticketId);
@@ -51,7 +47,7 @@ namespace TicketApplication.Controllers
             return IsStaff || ticket.CreatedByUserId == CurrentUserId;
         }
 
-        // GET -> Liste der Anhänge (nur Metadaten).
+        // GET — anhangliste, nur metadaten
         [HttpGet]
         public async Task<ActionResult<IEnumerable<AttachmentResponseDto>>> Get(int ticketId)
         {
@@ -81,10 +77,9 @@ namespace TicketApplication.Controllers
             return Ok(list);
         }
 
-        // POST (multipart/form-data) -> Datei hochladen.
-        // Felder: file (Datei), isPrivate (bool).
+        // POST multipart — upload, felder: file + isPrivate
         [HttpPost]
-        [RequestSizeLimit(MaxBytes + 4096)] // etwas Puffer für Multipart-Overhead
+        [RequestSizeLimit(MaxBytes + 4096)] // puffer für multipart-overhead
         public async Task<ActionResult<AttachmentResponseDto>> Upload(
             int ticketId, [FromForm] IFormFile? file, [FromForm] bool isPrivate)
         {
@@ -93,7 +88,6 @@ namespace TicketApplication.Controllers
             if (!await DarfTicketSehen(ticketId))
                 return Forbid();
 
-            // --- Eingangsprüfung (dies ist das Eintrittstor) ---
             if (file == null || file.Length == 0)
                 return BadRequest("Keine Datei übergeben.");
             if (file.Length > MaxBytes)
@@ -103,7 +97,6 @@ namespace TicketApplication.Controllers
             if (string.IsNullOrWhiteSpace(originalName) || originalName.Length > 255)
                 return BadRequest("Ungültiger Dateiname.");
 
-            // Datei in den Speicher lesen.
             byte[] bytes;
             using (var ms = new MemoryStream())
             {
@@ -125,13 +118,13 @@ namespace TicketApplication.Controllers
 
             if (isPrivate)
             {
-                // Privat: verschlüsselt in der DB ablegen.
+                // verschlüsselt in die db
                 attachment.DatenBase64 = FileCrypto.Encrypt(bytes, EncryptionKey);
                 attachment.DirectoryPath = string.Empty;
             }
             else
             {
-                // Öffentlich: als Datei im Projekt-Unterordner speichern.
+                // als datei auf die platte
                 var relDir = Path.Combine(StorageFolder, ticketId.ToString());
                 var absDir = Path.Combine(_env.ContentRootPath, relDir);
                 Directory.CreateDirectory(absDir);
@@ -167,7 +160,7 @@ namespace TicketApplication.Controllers
             });
         }
 
-        // GET {attachmentId}/download -> Datei herunterladen.
+        // GET {attachmentId}/download — datei ausliefern, ggf. entschlüsseln
         [HttpGet("{attachmentId}/download")]
         public async Task<IActionResult> Download(int ticketId, int attachmentId)
         {
@@ -181,7 +174,6 @@ namespace TicketApplication.Controllers
             byte[] bytes;
             if (att.ContainsPrivateData)
             {
-                // Entschlüsseln.
                 bytes = FileCrypto.Decrypt(att.DatenBase64, EncryptionKey);
             }
             else
@@ -195,8 +187,7 @@ namespace TicketApplication.Controllers
             return File(bytes, att.ContentType, att.DataName);
         }
 
-        // DELETE {attachmentId} -> Anhang löschen.
-        // Staff darf alle, sonst nur der Hochlader.
+        // DELETE {attachmentId} — löschen; staff alles, sonst nur der hochlader
         [HttpDelete("{attachmentId}")]
         public async Task<IActionResult> Delete(int ticketId, int attachmentId)
         {
@@ -207,7 +198,7 @@ namespace TicketApplication.Controllers
             if (!IsStaff && att.UploadedByUserId != CurrentUserId)
                 return Forbid();
 
-            // Bei öffentlicher Datei auch von der Platte entfernen.
+            // öffentliche datei auch von der platte entfernen
             if (!att.ContainsPrivateData && !string.IsNullOrEmpty(att.DirectoryPath))
             {
                 var absPath = Path.Combine(_env.ContentRootPath, att.DirectoryPath);

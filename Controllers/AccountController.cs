@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
@@ -7,6 +7,7 @@ using TicketApplication.DTOs;
 
 namespace TicketApplication.Controllers
 {
+    // eigenes profil: anzeigen, bearbeiten, passwort ändern
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
@@ -19,12 +20,10 @@ namespace TicketApplication.Controllers
             _context = context;
         }
 
-        // GET /api/account/me  →  Eigenes Profil abrufen
+        // GET api/account/me — eigenes profil, id kommt aus dem jwt
         [HttpGet("me")]
         public async Task<ActionResult<UserResponseDto>> GetMe()
         {
-            // Wir lesen die ID aus dem JWT Token — nicht aus der URL!
-            // ClaimTypes.NameIdentifier = das was wir beim Login in CreateToken() gesetzt haben
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
             var user = await _context.Users.FindAsync(userId);
@@ -42,12 +41,13 @@ namespace TicketApplication.Controllers
                 Email = user.Email,
                 Role = user.Role.ToString(),
                 IsActivated = user.IsActivated,
+                IsActive = user.IsActive,
                 DepartmentId = user.DepartmentId,
                 DepartmentName = departmentName
             });
         }
 
-        // PUT /api/account/me  →  Eigenes Profil bearbeiten
+        // PUT api/account/me — eigenes profil ändern, e-mail bewusst nicht änderbar
         [HttpPut("me")]
         public async Task<IActionResult> UpdateMe(UpdateProfileDto dto)
         {
@@ -70,8 +70,7 @@ namespace TicketApplication.Controllers
                 user.SecondName = dto.SecondName;
             }
 
-            // Abteilung: nur für Rolle User änderbar. Admin/Support haben keine
-            // Abteilung (siehe Vorgabe) – ein gesetzter Wert wird für sie ignoriert.
+            // abteilung nur für rolle user, bei staff wird ein gesetzter wert ignoriert
             if (dto.DepartmentName != null && user.Role == UserRole.User)
             {
                 var depId = await _context.Departments
@@ -82,12 +81,11 @@ namespace TicketApplication.Controllers
                 user.DepartmentId = depId;
             }
 
-            // E-Mail wird bewusst NICHT geändert (nicht Teil des DTO).
-
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
+        // PUT api/account/me/password — passwort ändern, altes muss stimmen
         [HttpPut("me/password")]
         public async Task<IActionResult> ChangePassword(ChangePasswordDto dto)
         {
@@ -97,12 +95,10 @@ namespace TicketApplication.Controllers
             if (user == null || !user.IsActive)
                 return NotFound();
 
-            // Altes Passwort prüfen — der User muss sein aktuelles Passwort kennen
             bool isValid = BCrypt.Net.BCrypt.Verify(dto.OldPassword, user.PasswordHash);
             if (!isValid)
                 return BadRequest("Das alte Passwort ist falsch.");
 
-            // Neues Passwort hashen und speichern
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
             await _context.SaveChangesAsync();
 

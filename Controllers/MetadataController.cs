@@ -6,9 +6,7 @@ using TicketApplication.DTOs;
 
 namespace TicketApplication.Controllers
 {
-    // Stammdaten/Auswahllisten für das Frontend (Abteilungen, Themen, Bearbeiter).
-    // Jeder eingeloggte User darf diese Listen lesen, damit die Formulare
-    // gültige Werte anbieten können (z.B. Abteilung beim Ticket-Erstellen).
+    // stammdaten für formulare: abteilungen, themen, bearbeiter
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
@@ -21,10 +19,8 @@ namespace TicketApplication.Controllers
             _context = context;
         }
 
-        // GET /api/metadata/departments -> Liste aller Abteilungen.
-        // [AllowAnonymous]: wird auch auf der Registrierungsseite (ohne Login)
-        // gebraucht, damit der neue User seine Abteilung wählen kann.
-        // Abteilungsnamen sind nicht sensibel.
+        // GET api/metadata/departments — alle abteilungen
+        // anonym erlaubt, wird auf der registrierungsseite gebraucht
         [HttpGet("departments")]
         [AllowAnonymous]
         public async Task<ActionResult<IEnumerable<DepartmentDto>>> Departments()
@@ -36,8 +32,7 @@ namespace TicketApplication.Controllers
             return Ok(list);
         }
 
-        // GET /api/metadata/subjects -> Liste der Themen, optional pro Abteilung
-        // und optional nur verifizierte (für das Dropdown beim Ticket-Erstellen).
+        // GET api/metadata/subjects — themen, optional gefiltert nach abteilung/verifiziert
         [HttpGet("subjects")]
         public async Task<ActionResult<IEnumerable<SubjectDto>>> Subjects(
             [FromQuery] int? departmentId, [FromQuery] bool verifiedOnly = false)
@@ -61,9 +56,7 @@ namespace TicketApplication.Controllers
             return Ok(list);
         }
 
-        // GET /api/metadata/agents -> Liste der Bearbeiter (Admin/Support).
-        // Wird im Frontend für die Zuweisung eines Tickets gebraucht.
-        // Nur Staff darf diese Liste sehen.
+        // GET api/metadata/agents — bearbeiterliste für die zuweisung, nur staff
         [HttpGet("agents")]
         [Authorize(Roles = "Admin,Support")]
         public async Task<ActionResult<IEnumerable<UserResponseDto>>> Agents()
@@ -80,6 +73,7 @@ namespace TicketApplication.Controllers
                     Email = u.Email,
                     Role = u.Role.ToString(),
                     IsActivated = u.IsActivated,
+                    IsActive = u.IsActive,
                     DepartmentId = u.DepartmentId,
                     DepartmentName = _context.Departments
                         .Where(d => d.Id == u.DepartmentId)

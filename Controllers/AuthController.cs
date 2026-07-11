@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -6,16 +6,11 @@ using System.Security.Claims;
 using System.Text;
 using TicketApplication.Data;
 using TicketApplication.Models;
-using BCrypt.Net;
 using TicketApplication.DTOs;
 
 namespace TicketApplication.Controllers
 {
-    // Controller für die Authentifizierung
-    // Route: api/auth/login
-    // POST Body: { "email": "", "password": "" }
-    // Antwort: { "token": "..." } oder 401 Unauthorized
-
+    // login + registrierung, gibt jwt zurück
     [Route("api/[controller]")]
     [ApiController]
     public class AuthController : ControllerBase
@@ -29,53 +24,51 @@ namespace TicketApplication.Controllers
             _config = config;
         }
 
+        // POST api/auth/login — prüft zugangsdaten, liefert token
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
-            // User suchen (auch inaktive, um "abgelehnt" erkennen zu können).
+            // aktiven user bevorzugen, sonst inaktiven für die "abgelehnt"-meldung
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == loginDto.Email);
+                .Where(u => u.Email == loginDto.Email)
+                .OrderByDescending(u => u.IsActive)
+                .FirstOrDefaultAsync();
 
             if (user == null) return Unauthorized("Ungültige E-Mail oder Passwort.");
 
-            // Passwort ZUERST prüfen, damit wir den Kontostatus nicht an
-            // beliebige Fremde preisgeben (Schutz gegen Konto-Erkundung).
+            // passwort zuerst prüfen, kontostatus nicht an fremde verraten
             bool isValid = BCrypt.Net.BCrypt.Verify(loginDto.Password, user.PasswordHash);
             if (!isValid) return Unauthorized("Ungültige E-Mail oder Passwort.");
 
-            // Abgelehnt / deaktiviert (Soft-Delete).
             if (!user.IsActive)
             {
                 return Unauthorized("Dein Konto wurde abgelehnt oder deaktiviert. Bitte wende dich an einen Administrator.");
             }
 
-            // Noch nicht durch Admin freigeschaltet.
             if (!user.IsActivated)
             {
                 return Unauthorized("Konto wurde noch nicht durch einen Admin freigeschaltet.");
             }
 
-            // Token erstellen
             var token = CreateToken(user);
 
             return Ok(new { token = token });
         }
 
+        // POST api/auth/register — legt user an, freischaltung macht der admin
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto registerDto)
         {
-            // Es können sich nur USER registrieren, Admins und Support müssen manuell angelegt werden
+            // nur rolle user, admins/support werden manuell angelegt
             bool emailExists = await _context.Users.AnyAsync(u => u.Email == registerDto.Email && u.IsActive);
 
             if (emailExists)
             {
                 return BadRequest("Ein Benutzer mit dieser E-Mail-Adresse existiert bereits.");
             }
-            
-            // Passwort hashen
+
             string passwordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
 
-            // Abteilung auflösen (Existenz wurde im DTO geprüft).
             var departmentId = await _context.Departments
                 .Where(d => d.Name == registerDto.DepartmentName)
                 .Select(d => (int?)d.Id)
@@ -90,7 +83,7 @@ namespace TicketApplication.Controllers
                 Role = UserRole.User,
                 DepartmentId = departmentId,
                 IsActive = true,
-                IsActivated = false   // muss erst durch einen Admin freigeschaltet werden
+                IsActivated = false // erst nach admin-freischaltung nutzbar
             };
 
             _context.Users.Add(user);
@@ -99,9 +92,9 @@ namespace TicketApplication.Controllers
             return Ok(new { message = "Registrierung eingegangen. Ein Admin wird dein Konto in Kürze freischalten." });
         }
 
+        // jwt bauen: id, mail und rolle als claims
         private string CreateToken(User user)
         {
-            // "Claims" sind die Infos die im Ausweis stehen (Id, Email, Rolle)
             var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
@@ -109,14 +102,14 @@ namespace TicketApplication.Controllers
             new Claim(ClaimTypes.Role, user.Role.ToString())
         };
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
                 issuer: _config["Jwt:Issuer"],
                 audience: _config["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddMinutes(double.Parse(_config["Jwt:DurationInMinutes"])),
+                expires: DateTime.UtcNow.AddMinutes(double.Parse(_config["Jwt:DurationInMinutes"]!)),
                 signingCredentials: creds
             );
 
