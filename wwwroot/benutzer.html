@@ -112,7 +112,8 @@
                         <tbody>${pending.map(u => `
                             <tr>
                                 <td>${esc(u.firstName)} ${esc(u.secondName)}</td>
-                                <td>${esc(u.email)}</td>
+                                <td>${esc(u.email)}
+                                    ${u.emailConfirmed ? '' : '<br><span class="mini" style="color:#e0a800">E-Mail noch nicht bestätigt</span>'}</td>
                                 <td>${esc(u.departmentName || '—')}</td>
                                 <td>
                                     <button class="btn-gruen btn-mini" onclick="freischalten(${u.id})">Freischalten</button>

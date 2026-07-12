@@ -6,7 +6,7 @@ namespace TicketApplication.Data
     // achtung: EnsureCreated migriert nicht — bei model-änderungen lokale db löschen
     public class DbInitializer
     {
-        public static void Initialize(ApplicationDbContext context)
+        public static void Initialize(ApplicationDbContext context, bool isDevelopment = false)
         {
             context.Database.EnsureCreated();
 
@@ -21,11 +21,9 @@ namespace TicketApplication.Data
                 context.SaveChanges();
             }
 
-            // dev-standarduser, passwort jeweils "Password"
-            // admin@user.com / support@user.com / user@user.com
-            if (!context.Users.Any())
+            // dev-testuser, passwort jeweils "Password"
+            if (isDevelopment && !context.Users.Any())
             {
-                // nur die rolle user bekommt eine abteilung
                 int? einkaufDep = context.Departments.Where(d => d.Name == "Einkauf").Select(d => (int?)d.Id).FirstOrDefault();
 
                 context.Users.AddRange(
@@ -38,7 +36,8 @@ namespace TicketApplication.Data
                         Role = UserRole.Admin,
                         DepartmentId = null,
                         IsActivated = true,
-                        IsActive = true
+                        IsActive = true,
+                        EmailConfirmed = true
                     },
                     new User
                     {
@@ -49,7 +48,8 @@ namespace TicketApplication.Data
                         Role = UserRole.Support,
                         DepartmentId = null,
                         IsActivated = true,
-                        IsActive = true
+                        IsActive = true,
+                        EmailConfirmed = true
                     },
                     new User
                     {
@@ -60,8 +60,29 @@ namespace TicketApplication.Data
                         Role = UserRole.User,
                         DepartmentId = einkaufDep,
                         IsActivated = true,
-                        IsActive = true
+                        IsActive = true,
+                        EmailConfirmed = true
                     });
+                context.SaveChanges();
+            }
+
+            // default-admin (admin@ticket.local / admin) falls kein admin existiert;
+            // muss beim ersten login das passwort ändern
+            if (!context.Users.Any(u => u.Role == UserRole.Admin && u.IsActive))
+            {
+                context.Users.Add(new User
+                {
+                    FirstName = "Standard",
+                    SecondName = "Admin",
+                    Email = Controllers.SetupController.DefaultAdminEmail,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(Controllers.SetupController.DefaultAdminPassword),
+                    Role = UserRole.Admin,
+                    DepartmentId = null,
+                    IsActivated = true,
+                    IsActive = true,
+                    EmailConfirmed = true,
+                    MustChangePassword = true
+                });
                 context.SaveChanges();
             }
 

@@ -51,6 +51,13 @@
         (async function () {
             await seitenleisteAufbauen('profil');
             const mich = await getMich();
+
+            // zwangswechsel nach erstem login mit dem standard-admin
+            if (new URLSearchParams(window.location.search).get('pwzwang') === '1') {
+                const fb = document.getElementById('pwFeedback');
+                fb.textContent = 'Bitte jetzt das Passwort ändern - erst danach ist die Anwendung nutzbar.';
+                fb.className = 'feedback-rot';
+            }
             document.getElementById('vorname').value = mich.firstName || '';
             document.getElementById('nachname').value = mich.secondName || '';
             document.getElementById('email').value = mich.email || '';
@@ -108,9 +115,14 @@
                     body: JSON.stringify({ oldPassword: alt, newPassword: neu })
                 });
                 fb.textContent = 'Passwort geändert.';
+                fb.className = 'feedback-gruen';
                 document.getElementById('altPw').value = '';
                 document.getElementById('neuPw').value = '';
                 document.getElementById('neuPw2').value = '';
+                // nach zwangswechsel weiter zur startseite
+                if (new URLSearchParams(window.location.search).get('pwzwang') === '1') {
+                    setTimeout(() => { window.location.href = '/dashboard.html'; }, 1200);
+                }
             } catch (e) { fb.textContent = e.message; }
         }
     </script>

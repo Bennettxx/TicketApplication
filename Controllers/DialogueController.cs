@@ -5,6 +5,7 @@ using System.Security.Claims;
 using TicketApplication.Data;
 using TicketApplication.DTOs;
 using TicketApplication.Models;
+using TicketApplication.Services;
 
 namespace TicketApplication.Controllers
 {
@@ -15,10 +16,16 @@ namespace TicketApplication.Controllers
     public class DialogueController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly MailService _mail;
+        private readonly MailQueue _mailQueue;
+        private readonly LogService _log;
 
-        public DialogueController(ApplicationDbContext context)
+        public DialogueController(ApplicationDbContext context, MailService mail, MailQueue mailQueue, LogService log)
         {
             _context = context;
+            _mail = mail;
+            _mailQueue = mailQueue;
+            _log = log;
         }
 
         private int CurrentUserId =>
@@ -92,6 +99,34 @@ namespace TicketApplication.Controllers
             ticket.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // mail an beteiligte (ersteller + bearbeiter, außer autor), keine internen notizen
+            if (!message.IsInternal && await _mail.IsConfiguredAsync())
+            {
+                var empfaengerIds = new List<int?> { ticket.CreatedByUserId, ticket.AssignedToId }
+                    .Where(id => id != null && id != userId)
+                    .Select(id => id!.Value)
+                    .Distinct()
+                    .ToList();
+
+                if (empfaengerIds.Count > 0)
+                {
+                    var mails = await _context.Users
+                        .Where(u => empfaengerIds.Contains(u.Id) && u.IsActive)
+                        .Select(u => u.Email)
+                        .ToListAsync();
+                    var link = $"{Request.Scheme}://{Request.Host}/ticket.html?id={ticket.Id}";
+                    foreach (var m in mails)
+                    {
+                        _mailQueue.Enqueue(m,
+                            $"Ticket #{ticket.Id}: Neue Antwort - {ticket.Title}",
+                            $"Es gibt eine neue Antwort auf das Ticket #{ticket.Id} \"{ticket.Title}\".\n\n" +
+                            $"Zum Ticket: {link}");
+                    }
+                }
+            }
+
+            _log.Info(LogBereich.Tickets, $"Nachricht zu Ticket #{ticket.Id} von User {userId}{(message.IsInternal ? " (intern)" : "")}");
 
             var email = await _context.Users
                 .Where(u => u.Id == userId)

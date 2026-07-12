@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Einstellungen</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .karte { max-width: 620px; margin-bottom: 20px; }
+        .zeile2 { display: flex; gap: 12px; }
+        .zeile2 > div { flex: 1; }
+        h3 { margin-top: 0; color: #2c3e50; }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar"></div>
+
+    <div class="main">
+        <span class="benutzer" id="benutzername">...</span>
+        <h1>Einstellungen</h1>
+
+        <!-- smtp / mailversand -->
+        <div class="karte">
+            <h3>E-Mail-Versand (SMTP)</h3>
+            <label style="font-weight:normal;">
+                <input type="checkbox" id="sEnabled" style="width:auto;"> Mailversand aktiviert
+            </label>
+            <div class="zeile2">
+                <div>
+                    <label>SMTP-Server</label>
+                    <input type="text" id="sHost" placeholder="smtp.firma.de">
+                </div>
+                <div style="max-width:120px;">
+                    <label>Port</label>
+                    <input type="number" id="sPort" value="587" min="1" max="65535">
+                </div>
+            </div>
+            <label style="font-weight:normal; margin-top:8px;">
+                <input type="checkbox" id="sSsl" style="width:auto;"> SSL direkt (Port 465); sonst STARTTLS
+            </label>
+            <div class="zeile2">
+                <div>
+                    <label>Benutzer (optional)</label>
+                    <input type="text" id="sUser">
+                </div>
+                <div>
+                    <label>Passwort</label>
+                    <input type="password" id="sPasswort" placeholder="">
+                    <span class="mini" id="pwHinweis"></span>
+                </div>
+            </div>
+            <div class="zeile2">
+                <div>
+                    <label>Absenderadresse</label>
+                    <input type="email" id="sFrom" placeholder="tickets@firma.de">
+                </div>
+                <div>
+                    <label>Absendername</label>
+                    <input type="text" id="sFromName" placeholder="Ticket System">
+                </div>
+            </div>
+            <div style="margin-top:12px;">
+                <button class="btn-gruen" onclick="smtpSpeichern()">Speichern</button>
+                <button class="btn-grau" onclick="testmail()">Testmail senden</button>
+            </div>
+            <p class="mini">Die Testmail geht an die hinterlegte Absenderadresse.</p>
+            <span id="smtpFeedback" class="mini"></span>
+        </div>
+
+        <!-- logging -->
+        <div class="karte">
+            <h3>Logging</h3>
+            <label>Log-Verzeichnis</label>
+            <input type="text" id="logPfad">
+            <p class="mini">Pro Funktionsbereich und Tag eine Datei. Logs älter als 60 Tage werden automatisch gelöscht.</p>
+            <button class="btn-gruen" onclick="logPfadSpeichern()">Speichern</button>
+            <span id="logFeedback" class="mini"></span>
+        </div>
+
+        <!-- db-verbindung -->
+        <div class="karte">
+            <h3>Datenbank-Verbindung</h3>
+            <p class="mini" id="legacyHinweis" style="display:none; color:#e0a800;">
+                Die Verbindung kommt aktuell noch aus appsettings/Umgebungsvariablen.
+                Beim Speichern wird sie in die geschützte Konfigurationsdatei übernommen.
+            </p>
+            <label>SQL-Server</label>
+            <input type="text" id="dServer">
+            <label>Datenbankname</label>
+            <input type="text" id="dDatenbank">
+            <label>Anmeldung</label>
+            <select id="dAuthArt" onchange="dAuthUmschalten()">
+                <option value="windows">Windows-Anmeldung</option>
+                <option value="sql">SQL-Server-Benutzer</option>
+            </select>
+            <div id="dSqlAuth" style="display:none;">
+                <label>SQL-Benutzer</label>
+                <input type="text" id="dUser">
+                <label>SQL-Passwort</label>
+                <input type="password" id="dPasswort">
+            </div>
+            <div style="margin-top:12px;">
+                <button class="btn-grau" onclick="dbTesten()">Verbindung testen</button>
+                <button class="btn-gruen" onclick="dbSpeichern()">Speichern</button>
+            </div>
+            <span id="dbFeedback" class="mini"></span>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+    <script>
+        // seite aufbauen, nur admin
+        (async function () {
+            await seitenleisteAufbauen('einstellungen');
+            const mich = await getMich();
+            if (mich.role !== 'Admin') {
+                document.querySelector('.main').innerHTML = '<p class="feedback-rot">Kein Zugriff. Nur Admins.</p>';
+                return;
+            }
+            await smtpLaden();
+            await systemLaden();
+        })();
+
+        function fb(id, text, ok) {
+            const el = document.getElementById(id);
+            el.textContent = text;
+            el.className = ok ? 'feedback-gruen' : 'feedback-rot';
+        }
+
+        // smtp-einstellungen laden (ohne passwort)
+        async function smtpLaden() {
+            try {
+                const s = await api('/api/settings/smtp');
+                document.getElementById('sEnabled').checked = s.enabled;
+                document.getElementById('sHost').value = s.host;
+                document.getElementById('sPort').value = s.port;
+                document.getElementById('sSsl').checked = s.useSsl;
+                document.getElementById('sUser').value = s.user;
+                document.getElementById('sFrom').value = s.fromAddress;
+                document.getElementById('sFromName').value = s.fromName;
+                document.getElementById('pwHinweis').textContent =
+                    s.hasPassword ? 'Passwort ist hinterlegt (leer lassen = behalten).' : 'Noch kein Passwort hinterlegt.';
+            } catch (e) { fb('smtpFeedback', e.message, false); }
+        }
+
+        // smtp speichern; leeres passwortfeld = altes behalten
+        async function smtpSpeichern() {
+            const pw = document.getElementById('sPasswort').value;
+            const body = {
+                enabled: document.getElementById('sEnabled').checked,
+                host: document.getElementById('sHost').value.trim(),
+                port: parseInt(document.getElementById('sPort').value) || 587,
+                useSsl: document.getElementById('sSsl').checked,
+                user: document.getElementById('sUser').value.trim(),
+                password: pw === '' ? null : pw,
+                fromAddress: document.getElementById('sFrom').value.trim() || null,
+                fromName: document.getElementById('sFromName').value.trim()
+            };
+            try {
+                await api('/api/settings/smtp', { method: 'PUT', body: JSON.stringify(body) });
+                document.getElementById('sPasswort').value = '';
+                fb('smtpFeedback', 'Gespeichert.', true);
+                await smtpLaden();
+            } catch (e) { fb('smtpFeedback', e.message, false); }
+        }
+
+        // testmail an die absenderadresse
+        async function testmail() {
+            fb('smtpFeedback', 'Sende Testmail...', true);
+            try {
+                const r = await api('/api/settings/smtp/test', { method: 'POST' });
+                fb('smtpFeedback', r.message, r.ok);
+            } catch (e) { fb('smtpFeedback', e.message, false); }
+        }
+
+        // log-pfad + db-daten laden
+        async function systemLaden() {
+            try {
+                const s = await api('/api/settings/system');
+                document.getElementById('logPfad').value = s.logPath;
+                document.getElementById('dServer').value = s.dbServer;
+                document.getElementById('dDatenbank').value = s.dbDatabase;
+                document.getElementById('dAuthArt').value = s.dbUseWindowsAuth ? 'windows' : 'sql';
+                document.getElementById('dUser').value = s.dbUser;
+                document.getElementById('legacyHinweis').style.display = s.legacyConfig ? 'block' : 'none';
+                dAuthUmschalten();
+            } catch (e) { fb('dbFeedback', e.message, false); }
+        }
+
+        // log-pfad speichern
+        async function logPfadSpeichern() {
+            const pfad = document.getElementById('logPfad').value.trim();
+            if (!pfad) { fb('logFeedback', 'Bitte einen Pfad angeben.', false); return; }
+            try {
+                await api('/api/settings/logpath', { method: 'PUT', body: JSON.stringify({ logPath: pfad }) });
+                fb('logFeedback', 'Gespeichert. Neue Logs landen ab sofort dort.', true);
+            } catch (e) { fb('logFeedback', e.message, false); }
+        }
+
+        function dAuthUmschalten() {
+            const sql = document.getElementById('dAuthArt').value === 'sql';
+            document.getElementById('dSqlAuth').style.display = sql ? 'block' : 'none';
+        }
+
+        // eingaben der db-karte einsammeln
+        function dbDaten() {
+            const sql = document.getElementById('dAuthArt').value === 'sql';
+            return {
+                server: document.getElementById('dServer').value.trim(),
+                database: document.getElementById('dDatenbank').value.trim(),
+                useWindowsAuth: !sql,
+                user: sql ? document.getElementById('dUser').value.trim() : null,
+                password: sql ? document.getElementById('dPasswort').value : null
+            };
+        }
+
+        // db-verbindung testen
+        async function dbTesten() {
+            const d = dbDaten();
+            if (!d.server || !d.database) { fb('dbFeedback', 'Server und Datenbankname sind Pflicht.', false); return; }
+            fb('dbFeedback', 'Teste Verbindung...', true);
+            try {
+                const r = await api('/api/settings/database/test', { method: 'POST', body: JSON.stringify(d) });
+                fb('dbFeedback', r.message, r.ok);
+            } catch (e) { fb('dbFeedback', e.message, false); }
+        }
+
+        // db-verbindung speichern (mit vorherigem test im backend)
+        async function dbSpeichern() {
+            const d = dbDaten();
+            if (!d.server || !d.database) { fb('dbFeedback', 'Server und Datenbankname sind Pflicht.', false); return; }
+            if (!confirm('DB-Verbindung wirklich ändern? Eine falsche Verbindung kann die Anwendung unbrauchbar machen.')) return;
+            try {
+                const r = await api('/api/settings/database', { method: 'PUT', body: JSON.stringify(d) });
+                fb('dbFeedback', r.message, true);
+                await systemLaden();
+            } catch (e) { fb('dbFeedback', e.message, false); }
+        }
+    </script>
+</body>
+</html>

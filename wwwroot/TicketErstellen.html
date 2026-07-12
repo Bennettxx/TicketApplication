@@ -803,19 +803,41 @@
             anhangRender();
         }
 
+        // alle pflichtfelder über alle schritte prüfen, liste der fehlenden zurückgeben
+        function fehlendePflichtfelder() {
+            const fehlt = [];
+            if (!document.querySelector('input[name="prioritaet"]:checked'))
+                fehlt.push('Priorität (Schritt 2)');
+            if (!document.getElementById('abteilung').value)
+                fehlt.push('Abteilung (Schritt 2)');
+            if (document.getElementById('komponente').value.trim().length < 2)
+                fehlt.push('Thema/Komponente, min. 2 Zeichen (Schritt 2)');
+            if (!document.getElementById('titel').value.trim())
+                fehlt.push('Titel (Schritt 3)');
+            if (!document.getElementById('szenario').value.trim())
+                fehlt.push('Szenario (Schritt 3)');
+            if (!document.getElementById('erwartet').value.trim())
+                fehlt.push('Erwartetes Ergebnis (Schritt 3)');
+            if (!document.getElementById('aktuell').value.trim())
+                fehlt.push('Aktuelles Ergebnis (Schritt 3)');
+            if (!document.getElementById('agreeBilling').checked)
+                fehlt.push('Kosten bestätigen (Schritt 5)');
+            if (!document.getElementById('agreeAgb').checked)
+                fehlt.push('AGB zustimmen (Schritt 5)');
+            if (kontakteSammeln().length > 3)
+                fehlt.push('Maximal 3 zusätzliche Kontakte (Schritt 1)');
+            return fehlt;
+        }
+
         // ticket absenden, danach anhänge hochladen
         async function senden() {
             const feedback = document.getElementById('feedback');
 
-            // beide bestätigungen prüfen, fehlende gesammelt anzeigen
-            const fehlend = [];
-            if (!document.getElementById('agreeBilling').checked)
-                fehlend.push('Kosten bestätigen');
-            if (!document.getElementById('agreeAgb').checked)
-                fehlend.push('AGB zustimmen');
-            if (fehlend.length > 0) {
+            // sammelmeldung: alles fehlende auf einmal anzeigen
+            const fehlt = fehlendePflichtfelder();
+            if (fehlt.length > 0) {
                 feedback.innerHTML =
-                    `<span style="color:red">Bitte noch bestätigen: ${fehlend.join(' und ')}.</span>`;
+                    `<span style="color:red">Es fehlt noch:<br>• ${fehlt.join('<br>• ')}</span>`;
                 return;
             }
 
@@ -829,17 +851,6 @@
             const kontakte = kontakteSammeln();
             const refTicket = document.getElementById('refTicket').value.trim();
             const refKommentar = document.getElementById('refKommentar').value.trim();
-
-            if (!szenario || !erwartet || !aktuell) {
-                feedback.innerHTML =
-                    `<span style="color:red">Bitte Szenario, erwartetes und aktuelles Ergebnis (Schritt 3) ausfüllen!</span>`;
-                return;
-            }
-            if (kontakte.length > 3) {
-                feedback.innerHTML =
-                    `<span style="color:red">Maximal 3 zusätzliche Kontakte möglich!</span>`;
-                return;
-            }
 
             // body passend zum CreateTicketDto
             const body = {

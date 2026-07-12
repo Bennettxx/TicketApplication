@@ -22,6 +22,7 @@ namespace TicketApplication.Data
         public DbSet<TicketRead> TicketReads { get; set; }
         public DbSet<Department> Departments { get; set; }
         public DbSet<Subject> Subjects { get; set; }
+        public DbSet<AppSetting> AppSettings { get; set; }
 
         // keys, fks und indizes, die nicht der konvention entsprechen
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -75,6 +76,12 @@ namespace TicketApplication.Data
             {
                 entity.HasKey(t => t.Id);
                 entity.HasIndex(t => new { t.TicketId, t.UserId }).IsUnique();
+            });
+
+            // einstellungen: key ist der pk
+            modelBuilder.Entity<AppSetting>(entity =>
+            {
+                entity.HasKey(t => t.Key);
             });
         }
 

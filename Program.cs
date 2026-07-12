@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using TicketApplication.Data;
+using TicketApplication.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,7 +24,7 @@ builder.Services.AddCors(options =>
 });
 
 // dev: appsettings.Local.json laden, fehlende keys automatisch erzeugen
-// prod: alles kommt aus umgebungsvariablen (siehe ANLEITUNG_UMGEBUNGSVARIABLEN.txt)
+// prod: security-keys aus umgebungsvariablen (siehe ANLEITUNG_UMGEBUNGSVARIABLEN.txt)
 if (builder.Environment.IsDevelopment())
 {
     builder.Configuration.AddJsonFile(
@@ -33,17 +34,6 @@ if (builder.Environment.IsDevelopment())
 
     EnsureJwtKeyExists(builder);
     EnsureAttachmentKeyExists(builder);
-}
-
-// connection-string früh prüfen, sonst kryptischer ef-fehler später
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-if (string.IsNullOrWhiteSpace(connectionString))
-{
-    throw new InvalidOperationException(
-        "ConnectionStrings:DefaultConnection ist nicht konfiguriert. " +
-        "Development: 'appsettings.Local.json' anlegen. " +
-        "Production: Umgebungsvariable 'ConnectionStrings__DefaultConnection' setzen " +
-        "(siehe ANLEITUNG_UMGEBUNGSVARIABLEN.txt).");
 }
 
 // prod: security-keys müssen gesetzt sein, hier wird nichts generiert
@@ -57,12 +47,26 @@ if (!builder.Environment.IsDevelopment())
             "Attachments:Key fehlt. In Produktion Umgebungsvariable 'Attachments__Key' setzen (siehe ANLEITUNG_UMGEBUNGSVARIABLEN.txt).");
 }
 
-// db-context registrieren, sql-logging nur im dev-modus
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+// eigene services: geschützte config, datei-logging, mail-queue + versand
+builder.Services.AddSingleton<AppConfigService>();
+builder.Services.AddSingleton<LogService>();
+builder.Services.AddSingleton<MailQueue>();
+builder.Services.AddScoped<MailService>();
+builder.Services.AddHostedService<MailDispatcherService>();
+builder.Services.AddHostedService<LogCleanupService>();
+
+// db-context: connection-string kommt zur laufzeit aus der app-config
+// (ohne config läuft die app im setup-modus, dann wird der context nicht benutzt)
+builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
 {
-    options.UseSqlServer(connectionString);
-    if (builder.Environment.IsDevelopment())
-        options.LogTo(Console.WriteLine, LogLevel.Information);
+    var cfg = sp.GetRequiredService<AppConfigService>();
+    var cs = cfg.GetConnectionString();
+    if (!string.IsNullOrWhiteSpace(cs))
+    {
+        options.UseSqlServer(cs);
+        if (builder.Environment.IsDevelopment())
+            options.LogTo(Console.WriteLine, LogLevel.Information);
+    }
 });
 
 builder.Services.AddControllers();
@@ -89,6 +93,23 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+var appConfig = app.Services.GetRequiredService<AppConfigService>();
+var logService = app.Services.GetRequiredService<LogService>();
+
+// unbehandelte fehler in fehler-log schreiben
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex)
+    {
+        logService.Error(LogBereich.Fehler, $"{context.Request.Method} {context.Request.Path}", ex);
+        throw;
+    }
+});
+
 // api-doku nur im dev-modus
 if (app.Environment.IsDevelopment())
 {
@@ -97,6 +118,31 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// setup-modus: ohne db-config alles auf setup.html umleiten
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
+    if (!appConfig.IsConfigured)
+    {
+        bool erlaubt = path.StartsWith("/api/setup")
+            || path == "/setup.html"
+            || path.EndsWith(".css") || path.EndsWith(".js")
+            || path.EndsWith(".png") || path.EndsWith(".ico");
+        if (!erlaubt)
+        {
+            context.Response.Redirect("/setup.html");
+            return;
+        }
+    }
+    else if (path == "/setup.html")
+    {
+        context.Response.Redirect("/index.html");
+        return;
+    }
+    await next();
+});
+
 app.UseDefaultFiles();
 
 // statische dateien; im dev-modus cache aus, damit frontend-änderungen sofort ankommen
@@ -138,16 +184,61 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// passwort-zwangswechsel: solange das flag gesetzt ist, sind nur
+// login/logout, profil lesen und passwort ändern erlaubt
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
+    if (context.User?.Identity?.IsAuthenticated == true && path.StartsWith("/api"))
+    {
+        bool erlaubt = path.StartsWith("/api/auth")
+            || path == "/api/account/me/password"
+            || path == "/api/account/me"
+            || path == "/api/user/me";
+        if (!erlaubt)
+        {
+            var idStr = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (int.TryParse(idStr, out var uid) && uid > 0)
+            {
+                var db = context.RequestServices.GetRequiredService<ApplicationDbContext>();
+                var muss = await db.Users
+                    .Where(u => u.Id == uid)
+                    .Select(u => u.MustChangePassword)
+                    .FirstOrDefaultAsync();
+                if (muss)
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    await context.Response.WriteAsync("Bitte zuerst das Passwort ändern (Mein Profil).");
+                    return;
+                }
+            }
+        }
+    }
+    await next();
+});
+
 app.UseAuthorization();
 
 app.MapControllers();
 
-// db anlegen + startdaten einspielen
-using (var scope = app.Services.CreateScope())
+// db anlegen + startdaten, nur wenn eine verbindung konfiguriert ist
+if (appConfig.IsConfigured)
 {
-    var services = scope.ServiceProvider;
-    var context = services.GetRequiredService<ApplicationDbContext>();
-    DbInitializer.Initialize(context);
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        DbInitializer.Initialize(context, app.Environment.IsDevelopment());
+        logService.Info(LogBereich.App, "Anwendung gestartet, Datenbank initialisiert.");
+    }
+    catch (Exception ex)
+    {
+        logService.Error(LogBereich.App, "Datenbank-Initialisierung beim Start fehlgeschlagen.", ex);
+    }
+}
+else
+{
+    logService.Info(LogBereich.App, "Anwendung im Setup-Modus gestartet (keine DB-Konfiguration).");
 }
 
 app.Run();

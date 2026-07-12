@@ -88,7 +88,8 @@ async function seitenleisteAufbauen(aktiv) {
                 { key: 'tickets', label: 'Offene Tickets', href: '/startseite.html', sichtbar: true },
                 { key: 'verlauf', label: 'Verlauf', href: '/verlauf.html', sichtbar: true },
                 { key: 'erstellen', label: 'Ticket erstellen', href: '/TicketErstellen.html', sichtbar: isUser },
-                { key: 'problem', label: 'Problem melden', href: '/problemMelden.html', sichtbar: true }
+                // problem melden nur für support und user, nicht für admin
+                { key: 'problem', label: 'Problem melden', href: '/problemMelden.html', sichtbar: !admin }
             ]
         },
         {
@@ -102,7 +103,8 @@ async function seitenleisteAufbauen(aktiv) {
             titel: 'Verwaltung', sichtbar: admin, punkte: [
                 { key: 'statistik', label: 'Statistik', href: '/statistik.html', sichtbar: admin },
                 { key: 'benutzer', label: 'Benutzer', href: '/benutzer.html', sichtbar: admin },
-                { key: 'probleme', label: 'Problemmeldungen', href: '/probleme.html', sichtbar: admin }
+                { key: 'probleme', label: 'Problemmeldungen', href: '/probleme.html', sichtbar: admin },
+                { key: 'einstellungen', label: 'Einstellungen', href: '/einstellungen.html', sichtbar: admin }
             ]
         },
         {

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using TicketApplication.Data;
 using TicketApplication.DTOs;
+using TicketApplication.Services;
 
 namespace TicketApplication.Controllers
 {
@@ -14,10 +15,12 @@ namespace TicketApplication.Controllers
     public class AccountController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly LogService _log;
 
-        public AccountController(ApplicationDbContext context)
+        public AccountController(ApplicationDbContext context, LogService log)
         {
             _context = context;
+            _log = log;
         }
 
         // GET api/account/me — eigenes profil, id kommt aus dem jwt
@@ -100,8 +103,10 @@ namespace TicketApplication.Controllers
                 return BadRequest("Das alte Passwort ist falsch.");
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.MustChangePassword = false; // zwangswechsel erledigt
             await _context.SaveChangesAsync();
 
+            _log.Info(LogBereich.Auth, $"Passwort geändert: {user.Email}");
             return NoContent();
         }
     }

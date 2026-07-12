@@ -10,6 +10,7 @@ namespace TicketApplication.DTOs
         public string Role { get; set; } = string.Empty;
         public bool IsActivated { get; set; }
         public bool IsActive { get; set; } = true;
+        public bool EmailConfirmed { get; set; } = true;
 
         public int? DepartmentId { get; set; }
         public string? DepartmentName { get; set; }

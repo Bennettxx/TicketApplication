@@ -23,5 +23,12 @@ namespace TicketApplication.Models
 
         // soft-delete / sperre, user werden nie physisch gelöscht
         public bool IsActive { get; set; } = true;
+
+        // erzwingt passwortwechsel beim nächsten login (default-admin)
+        public bool MustChangePassword { get; set; } = false;
+
+        // mailbestätigung bei registrierung; ohne smtp-konfig direkt true
+        public bool EmailConfirmed { get; set; } = true;
+        public string? EmailConfirmToken { get; set; }
     }
 }

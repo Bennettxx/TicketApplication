@@ -5,6 +5,7 @@ using System.Security.Claims;
 using TicketApplication.Data;
 using TicketApplication.DTOs;
 using TicketApplication.Models;
+using TicketApplication.Services;
 
 namespace TicketApplication.Controllers
 {
@@ -15,10 +16,12 @@ namespace TicketApplication.Controllers
     public class UserController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly LogService _log;
 
-        public UserController(ApplicationDbContext context)
+        public UserController(ApplicationDbContext context, LogService log)
         {
             _context = context;
+            _log = log;
         }
 
         // GET api/user/me — eigene identität fürs frontend (name, rolle, navigation)
@@ -126,6 +129,8 @@ namespace TicketApplication.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
+            _log.Info(LogBereich.Benutzer, $"User angelegt durch Admin: {user.Email} (Rolle {user.Role})");
+
             return CreatedAtAction(nameof(Get), new { id = user.Id }, new UserResponseDto
             {
                 Id = user.Id,
@@ -201,6 +206,7 @@ namespace TicketApplication.Controllers
                 throw;
             }
 
+            _log.Info(LogBereich.Benutzer, $"User geändert: {user.Email} (Id {user.Id}, Rolle {user.Role}, Aktiv {user.IsActive})");
             return NoContent();
         }
 
@@ -218,6 +224,7 @@ namespace TicketApplication.Controllers
             user.IsActive = false;
             await _context.SaveChangesAsync();
 
+            _log.Info(LogBereich.Benutzer, $"User deaktiviert/abgelehnt: {user.Email} (Id {user.Id})");
             return NoContent();
         }
 
@@ -237,6 +244,7 @@ namespace TicketApplication.Controllers
                     Role = u.Role.ToString(),
                     IsActivated = u.IsActivated,
                     IsActive = u.IsActive,
+                    EmailConfirmed = u.EmailConfirmed,
                     DepartmentId = u.DepartmentId,
                     DepartmentName = _context.Departments
                         .Where(d => d.Id == u.DepartmentId)
@@ -263,6 +271,7 @@ namespace TicketApplication.Controllers
             user.IsActivated = true;
             await _context.SaveChangesAsync();
 
+            _log.Info(LogBereich.Benutzer, $"Registrierung freigeschaltet: {user.Email} (Id {user.Id})");
             return NoContent();
         }
 

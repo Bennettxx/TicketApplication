@@ -5,6 +5,7 @@ using System.Security.Claims;
 using TicketApplication.Data;
 using TicketApplication.DTOs;
 using TicketApplication.Models;
+using TicketApplication.Services;
 
 namespace TicketApplication.Controllers
 {
@@ -14,10 +15,16 @@ namespace TicketApplication.Controllers
     public class TicketController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly MailService _mail;
+        private readonly MailQueue _mailQueue;
+        private readonly LogService _log;
 
-        public TicketController(ApplicationDbContext context)
+        public TicketController(ApplicationDbContext context, MailService mail, MailQueue mailQueue, LogService log)
         {
             _context = context;
+            _mail = mail;
+            _mailQueue = mailQueue;
+            _log = log;
         }
 
         // user-id aus dem jwt, nie vom client
@@ -92,6 +99,8 @@ namespace TicketApplication.Controllers
 
             await WriteTransaction(ticket, userId);
             await _context.SaveChangesAsync();
+
+            _log.Info(LogBereich.Tickets, $"Ticket #{ticket.Id} erstellt von User {userId}: {ticket.Title}");
 
             var result = await ProjectTickets(_context.Tickets.Where(t => t.Id == ticket.Id)).FirstAsync();
             return CreatedAtAction(nameof(GetOne), new { id = ticket.Id }, result);
@@ -275,6 +284,8 @@ namespace TicketApplication.Controllers
 
             await WriteTransaction(ticket, userId);
             await _context.SaveChangesAsync();
+
+            _log.Info(LogBereich.Tickets, $"Ticket #{ticket.Id} Status -> {ticket.Status} durch User {userId}");
             return NoContent();
         }
 
@@ -308,6 +319,34 @@ namespace TicketApplication.Controllers
 
             await WriteTransaction(ticket, userId);
             await _context.SaveChangesAsync();
+
+            _log.Info(LogBereich.Tickets, $"Ticket #{ticket.Id} wiedereröffnet durch User {userId}");
+
+            // beteiligte per mail informieren (außer dem auslöser)
+            if (await _mail.IsConfiguredAsync())
+            {
+                var empfaengerIds = new List<int?> { ticket.CreatedByUserId, ticket.AssignedToId }
+                    .Where(x => x != null && x != userId)
+                    .Select(x => x!.Value)
+                    .Distinct()
+                    .ToList();
+                if (empfaengerIds.Count > 0)
+                {
+                    var mails = await _context.Users
+                        .Where(u => empfaengerIds.Contains(u.Id) && u.IsActive)
+                        .Select(u => u.Email)
+                        .ToListAsync();
+                    var link = $"{Request.Scheme}://{Request.Host}/ticket.html?id={ticket.Id}";
+                    foreach (var m in mails)
+                    {
+                        _mailQueue.Enqueue(m,
+                            $"Ticket #{ticket.Id}: Wiedereröffnet - {ticket.Title}",
+                            $"Das Ticket #{ticket.Id} \"{ticket.Title}\" wurde wiedereröffnet.\n\n" +
+                            $"Begründung: {dto.Message.Trim()}\n\nZum Ticket: {link}");
+                    }
+                }
+            }
+
             return NoContent();
         }
 
@@ -336,6 +375,8 @@ namespace TicketApplication.Controllers
             ticket.UpdatedAt = DateTime.UtcNow;
             await WriteTransaction(ticket, CurrentUserId);
             await _context.SaveChangesAsync();
+
+            _log.Info(LogBereich.Tickets, $"Ticket #{ticket.Id} Zuweisung -> {(ticket.AssignedToId?.ToString() ?? "niemand")} durch User {CurrentUserId}");
             return NoContent();
         }
 

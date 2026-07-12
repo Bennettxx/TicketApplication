@@ -73,7 +73,15 @@
     </div>
 
     <script>
-    // login: token holen, speichern, weiter zur startseite
+    // hinweis nach e-mail-bestätigung (link aus der mail)
+    if (new URLSearchParams(window.location.search).get('confirmed') === '1') {
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('feedback').innerHTML =
+                '<span style="color:green">E-Mail bestätigt! Sobald ein Admin dein Konto freischaltet, kannst du dich einloggen.</span>';
+        });
+    }
+
+    // login: token holen, speichern, weiter; bei zwangswechsel direkt zum profil
     async function anmelden() {
         const email = document.getElementById('emailInput').value;
         const pass = document.getElementById('passInput').value;
@@ -90,7 +98,9 @@
                 const daten = await response.json();
 
                 localStorage.setItem('meinToken', daten.token);
-                window.location.href = '/startseite.html';
+                window.location.href = daten.mustChangePassword
+                    ? '/profil.html?pwzwang=1'
+                    : '/startseite.html';
             } else {
                 // servermeldung anzeigen (z.B. "abgelehnt", "noch nicht freigeschaltet")
                 let msg = 'Login fehlgeschlagen.';
