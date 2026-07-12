@@ -22,49 +22,49 @@ namespace TicketApplication.Data
             }
 
             // dev-testuser, passwort jeweils "Password"
-            if (isDevelopment && !context.Users.Any())
-            {
-                int? einkaufDep = context.Departments.Where(d => d.Name == "Einkauf").Select(d => (int?)d.Id).FirstOrDefault();
+            //if (isDevelopment && !context.Users.Any())
+            //{
+            //    int? einkaufDep = context.Departments.Where(d => d.Name == "Einkauf").Select(d => (int?)d.Id).FirstOrDefault();
 
-                context.Users.AddRange(
-                    new User
-                    {
-                        FirstName = "A_Vorname",
-                        SecondName = "A_Nachname",
-                        Email = "admin@user.com",
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
-                        Role = UserRole.Admin,
-                        DepartmentId = null,
-                        IsActivated = true,
-                        IsActive = true,
-                        EmailConfirmed = true
-                    },
-                    new User
-                    {
-                        FirstName = "S_Vorname",
-                        SecondName = "S_Nachname",
-                        Email = "support@user.com",
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
-                        Role = UserRole.Support,
-                        DepartmentId = null,
-                        IsActivated = true,
-                        IsActive = true,
-                        EmailConfirmed = true
-                    },
-                    new User
-                    {
-                        FirstName = "U_Vorname",
-                        SecondName = "U_Nachname",
-                        Email = "user@user.com",
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
-                        Role = UserRole.User,
-                        DepartmentId = einkaufDep,
-                        IsActivated = true,
-                        IsActive = true,
-                        EmailConfirmed = true
-                    });
-                context.SaveChanges();
-            }
+            //    context.Users.AddRange(
+            //        new User
+            //        {
+            //            FirstName = "A_Vorname",
+            //            SecondName = "A_Nachname",
+            //            Email = "admin@user.com",
+            //            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
+            //            Role = UserRole.Admin,
+            //            DepartmentId = null,
+            //            IsActivated = true,
+            //            IsActive = true,
+            //            EmailConfirmed = true
+            //        },
+            //        new User
+            //        {
+            //            FirstName = "S_Vorname",
+            //            SecondName = "S_Nachname",
+            //            Email = "support@user.com",
+            //            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
+            //            Role = UserRole.Support,
+            //            DepartmentId = null,
+            //            IsActivated = true,
+            //            IsActive = true,
+            //            EmailConfirmed = true
+            //        },
+            //        new User
+            //        {
+            //            FirstName = "U_Vorname",
+            //            SecondName = "U_Nachname",
+            //            Email = "user@user.com",
+            //            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
+            //            Role = UserRole.User,
+            //            DepartmentId = einkaufDep,
+            //            IsActivated = true,
+            //            IsActive = true,
+            //            EmailConfirmed = true
+            //        });
+            //    context.SaveChanges();
+            //}
 
             // default-admin (admin@ticket.local / admin) falls kein admin existiert;
             // muss beim ersten login das passwort ändern
