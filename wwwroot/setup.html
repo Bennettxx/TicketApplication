@@ -39,6 +39,23 @@
         .mini { font-size: 12px; color: #777; }
         .ok { color: #28a745; font-weight: bold; }
         .fehler { color: #dc3545; font-weight: bold; }
+
+        /* info-icon mit hover-tooltip */
+        .info {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 17px; height: 17px; border-radius: 50%;
+            background: #2c3e50; color: white; font-size: 12px; font-style: italic;
+            font-family: Georgia, serif; cursor: help; position: relative;
+            vertical-align: middle; margin-left: 6px;
+        }
+        .info .tooltip {
+            display: none; position: absolute; left: 24px; top: -8px; z-index: 5;
+            width: 320px; background: #2c3e50; color: white;
+            font-size: 12.5px; font-style: normal; font-family: 'Segoe UI', Arial, sans-serif;
+            font-weight: normal; padding: 10px 14px; border-radius: 8px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.3); line-height: 1.5;
+        }
+        .info:hover .tooltip { display: block; }
         .ergebnis { background: #eaf6ff; border: 1px solid #b6e0fe; border-radius: 8px; padding: 14px; margin-top: 14px; }
     </style>
 </head>
@@ -59,9 +76,19 @@
             <label>Datenbankname</label>
             <input type="text" id="datenbank" placeholder="TicketApplicationDB">
 
-            <label>Anmeldung</label>
+            <label>Anmeldung
+                <span class="info">i
+                    <span class="tooltip">
+                        <b>Windows-Anmeldung:</b> nutzt das Windows-Konto, unter dem die Anwendung läuft –
+                        kein Passwort in der Konfiguration. Sinnvoll, wenn die App unter einem Benutzer-
+                        oder Dienstkonto mit SQL-Rechten läuft.<br><br>
+                        <b>SQL-Server-Benutzer:</b> eigenes Login direkt am SQL Server. Sinnvoll bei
+                        Betrieb als Windows-Dienst oder wenn der SQL Server auf einem anderen Rechner liegt.
+                    </span>
+                </span>
+            </label>
             <select id="authArt" onchange="authUmschalten()">
-                <option value="windows">Windows-Anmeldung (empfohlen)</option>
+                <option value="windows">Windows-Anmeldung</option>
                 <option value="sql">SQL-Server-Benutzer</option>
             </select>
 

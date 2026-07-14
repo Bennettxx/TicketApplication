@@ -19,6 +19,7 @@ namespace TicketApplication.Services
     {
         public DbConfig? Db { get; set; }
         public string? LogPath { get; set; }
+        public bool DebugLogging { get; set; }
     }
 
     // verwaltet die lokale, dpapi-verschlüsselte config-datei (appconfig.protected)
@@ -88,6 +89,19 @@ namespace TicketApplication.Services
             {
                 _data ??= new AppConfigData();
                 _data.LogPath = logPath;
+                Persist();
+            }
+        }
+
+        // debug-logging (detaillierte technische logs) an/aus
+        public bool DebugLogging => _data?.DebugLogging ?? false;
+
+        public void SaveDebugLogging(bool aktiv)
+        {
+            lock (_lock)
+            {
+                _data ??= new AppConfigData();
+                _data.DebugLogging = aktiv;
                 Persist();
             }
         }

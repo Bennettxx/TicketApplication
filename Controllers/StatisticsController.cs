@@ -107,31 +107,34 @@ namespace TicketApplication.Controllers
                                            select new { UserId = g.Key, Minutes = g.Sum(x => x.Minutes) })
                                           .ToDictionaryAsync(x => x.UserId, x => x.Minutes);
 
+            // nur echte kunden (rolle user); ersteller mit inzwischen anderer rolle fallen raus
             var userIds = ticketsByCustomer.Select(x => x.UserId).ToList();
             var users = await (from u in _context.Users
-                               where userIds.Contains(u.Id)
+                               where userIds.Contains(u.Id) && u.Role == UserRole.User
                                join d in _context.Departments on u.DepartmentId equals d.Id into dj
                                from d in dj.DefaultIfEmpty()
                                select new { u.Id, u.FirstName, u.SecondName, u.Email, DepartmentName = d != null ? d.Name : null })
                               .ToListAsync();
             var userMap = users.ToDictionary(u => u.Id);
 
-            var result = ticketsByCustomer.Select(c =>
-            {
-                userMap.TryGetValue(c.UserId, out var u);
-                return new CustomerStatsDto
+            var result = ticketsByCustomer
+                .Where(c => userMap.ContainsKey(c.UserId))
+                .Select(c =>
                 {
-                    UserId = c.UserId,
-                    Email = u?.Email ?? $"(User {c.UserId})",
-                    Name = u != null ? $"{u.FirstName} {u.SecondName}".Trim() : string.Empty,
-                    DepartmentName = u?.DepartmentName ?? "(ohne Abteilung)",
-                    TicketCount = c.Total,
-                    OpenTicketCount = c.Open,
-                    TotalMinutes = minutesByCustomer.GetValueOrDefault(c.UserId)
-                };
-            })
-            .OrderByDescending(c => c.TotalMinutes)
-            .ToList();
+                    var u = userMap[c.UserId];
+                    return new CustomerStatsDto
+                    {
+                        UserId = c.UserId,
+                        Email = u.Email,
+                        Name = $"{u.FirstName} {u.SecondName}".Trim(),
+                        DepartmentName = u.DepartmentName ?? "(ohne Abteilung)",
+                        TicketCount = c.Total,
+                        OpenTicketCount = c.Open,
+                        TotalMinutes = minutesByCustomer.GetValueOrDefault(c.UserId)
+                    };
+                })
+                .OrderByDescending(c => c.TotalMinutes)
+                .ToList();
 
             return Ok(result);
         }

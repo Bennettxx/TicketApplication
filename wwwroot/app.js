@@ -96,7 +96,7 @@ async function seitenleisteAufbauen(aktiv) {
             titel: 'Bearbeitung', sichtbar: staff, punkte: [
                 { key: 'kanban', label: 'Kanban-Board', href: '/kanban.html', sichtbar: staff },
                 { key: 'wissen', label: 'Wissensdatenbank', href: '/wissen.html', sichtbar: staff },
-                { key: 'themen', label: 'Themen', href: '/themen.html', sichtbar: staff }
+                { key: 'themen', label: 'Abteilungen & Themen', href: '/themen.html', sichtbar: staff }
             ]
         },
         {

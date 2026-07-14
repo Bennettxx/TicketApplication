@@ -35,6 +35,7 @@ namespace TicketApplication.DTOs
     public class SystemSettingsDto
     {
         public string LogPath { get; set; } = string.Empty;
+        public bool DebugLogging { get; set; }
         public string DbServer { get; set; } = string.Empty;
         public string DbDatabase { get; set; } = string.Empty;
         public bool DbUseWindowsAuth { get; set; } = true;
@@ -44,10 +45,12 @@ namespace TicketApplication.DTOs
         public bool LegacyConfig { get; set; }
     }
 
-    // eingang für log-pfad-änderung
+    // eingang für logging-einstellungen (pfad + debug-modus)
     public class LogPathDto
     {
         [Required(ErrorMessage = "Pfad ist erforderlich.")]
         public string LogPath { get; set; } = string.Empty;
+
+        public bool DebugLogging { get; set; }
     }
 }

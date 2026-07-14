@@ -43,10 +43,12 @@ namespace TicketApplication.Services
     public class MailService
     {
         private readonly ApplicationDbContext _context;
+        private readonly LogService _log;
 
-        public MailService(ApplicationDbContext context)
+        public MailService(ApplicationDbContext context, LogService log)
         {
             _context = context;
+            _log = log;
         }
 
         // alle smtp-keys aus der db laden, passwort entschlüsseln
@@ -120,12 +122,21 @@ namespace TicketApplication.Services
             msg.Body = new TextPart("plain") { Text = body };
 
             using var client = new SmtpClient();
+            var modus = s.UseSsl ? "SSL direkt" : "STARTTLS";
+            _log.Debug(LogBereich.Mail, $"SMTP: verbinde zu {s.Host}:{s.Port} ({modus})");
             await client.ConnectAsync(s.Host, s.Port,
                 s.UseSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable);
+            _log.Debug(LogBereich.Mail, $"SMTP: verbunden, Server meldet '{client.Capabilities}'");
             if (!string.IsNullOrWhiteSpace(s.User))
+            {
+                _log.Debug(LogBereich.Mail, $"SMTP: authentifiziere als '{s.User}'");
                 await client.AuthenticateAsync(s.User, s.Password);
-            await client.SendAsync(msg);
+                _log.Debug(LogBereich.Mail, "SMTP: Authentifizierung akzeptiert");
+            }
+            var antwort = await client.SendAsync(msg);
+            _log.Debug(LogBereich.Mail, $"SMTP: Nachricht an {to} übergeben, Server-Antwort: {antwort}");
             await client.DisconnectAsync(true);
+            _log.Debug(LogBereich.Mail, "SMTP: Verbindung sauber getrennt (QUIT)");
         }
     }
 
@@ -149,6 +160,7 @@ namespace TicketApplication.Services
             {
                 try
                 {
+                    _log.Debug(LogBereich.Mail, $"Queue: Nachricht entnommen (An: {mail.To}, Betreff: {mail.Subject})");
                     using var scope = _scopeFactory.CreateScope();
                     var mailService = scope.ServiceProvider.GetRequiredService<MailService>();
                     await mailService.SendAsync(mail.To, mail.Subject, mail.Body);

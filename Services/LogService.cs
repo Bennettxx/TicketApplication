@@ -10,22 +10,34 @@ namespace TicketApplication.Services
         public const string Mail = "mail";                  // mailversand
         public const string Einstellungen = "einstellungen";// settings-änderungen
         public const string Fehler = "fehler";              // unbehandelte exceptions
+        public const string Http = "http";                  // technische request-logs (debug)
     }
 
-    // einfaches datei-logging: pro bereich und tag eine datei im log-ordner
-    // format: 2026-07-11 10:00:00 [INFO] text
+    // logging mit umgebungsabhängigem ziel:
+    //   development -> konsole
+    //   production  -> datei pro bereich und tag im konfigurierten log-ordner
+    // Debug(...) schreibt nur, wenn der debug-modus in den einstellungen aktiv ist
     public class LogService
     {
         private readonly AppConfigService _config;
+        private readonly IHostEnvironment _env;
         private readonly object _lock = new();
 
-        public LogService(AppConfigService config)
+        public LogService(AppConfigService config, IHostEnvironment env)
         {
             _config = config;
+            _env = env;
         }
 
         public void Info(string bereich, string text) => Write(bereich, "INFO", text);
         public void Warn(string bereich, string text) => Write(bereich, "WARN", text);
+
+        // detaillierte technische logs, nur bei aktivem debug-modus
+        public void Debug(string bereich, string text)
+        {
+            if (!_config.DebugLogging) return;
+            Write(bereich, "DEBUG", text);
+        }
 
         public void Error(string bereich, string text, Exception? ex = null)
         {
@@ -33,18 +45,25 @@ namespace TicketApplication.Services
             Write(bereich, "ERROR", text);
         }
 
-        // zeile anhängen; logging darf die app nie zum absturz bringen
+        // zeile ausgeben; logging darf die app nie zum absturz bringen
         private void Write(string bereich, string level, string text)
         {
             try
             {
+                var zeile = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{level}] {text}";
+
+                if (_env.IsDevelopment())
+                {
+                    Console.WriteLine($"[{bereich}] {zeile}");
+                    return;
+                }
+
                 var dir = _config.LogPath;
                 Directory.CreateDirectory(dir);
                 var file = Path.Combine(dir, $"{bereich}-{DateTime.Now:yyyy-MM-dd}.log");
-                var zeile = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{level}] {text}{Environment.NewLine}";
                 lock (_lock)
                 {
-                    File.AppendAllText(file, zeile);
+                    File.AppendAllText(file, zeile + Environment.NewLine);
                 }
             }
             catch

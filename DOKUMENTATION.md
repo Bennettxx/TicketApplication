@@ -127,16 +127,46 @@ Anwendung sofort normal nutzbar.
 
 ### 2.5 Logging
 
-- Eigener, schlanker Datei-Logger (`LogService`), **kein** externes Framework.
-- Ablage: pro **Funktionsbereich und Tag** eine Datei im konfigurierten
-  Log-Verzeichnis, z. B. `auth-2026-07-11.log`.
+- Eigener, schlanker Logger (`LogService`), **kein** externes Framework.
+- **Ausgabeziel je Umgebung:** Development → **Konsole**; Production →
+  **Datei** pro Funktionsbereich und Tag im konfigurierten Log-Verzeichnis,
+  z. B. `auth-2026-07-11.log`.
 - Bereiche: `app` (Start/Setup), `auth` (Login/Registrierung/Passwörter),
   `benutzer` (Verwaltung), `tickets` (Ticket-Aktionen), `mail` (Versand),
-  `einstellungen` (Settings-Änderungen), `fehler` (unbehandelte Exceptions).
-- Zeilenformat: `2026-07-11 10:00:00 [INFO] Text`.
+  `einstellungen` (Settings-/Stammdaten-Änderungen), `fehler` (unbehandelte
+  Exceptions), `http` (technische Request-Logs).
+- Zeilenformat: `2026-07-11 10:00:00 [INFO|WARN|ERROR|DEBUG] Text`.
+- **Debug-Modus** (Checkbox unter Verwaltung → Einstellungen, Ablage in der
+  geschützten Config): Bei aktivem Modus werden zusätzlich detaillierte
+  technische Logs geschrieben – jeder API-Request mit Methode/Pfad/Status/
+  Dauer (`http`), SMTP-Verbindungsschritte (Connect, TLS, Auth, Server-
+  Antwort), Queue-Ereignisse und Start-Diagnose. Ohne Debug-Modus bleibt es
+  bei den fachlichen INFO/WARN/ERROR-Einträgen.
 - **Bereinigung:** Ein Hintergrunddienst löscht beim Start und danach täglich
   alle Log-Dateien, die älter als **60 Tage** sind.
 - Log-Pfad: beim Setup wählbar, später unter Einstellungen änderbar.
+
+### 2.7 Unit-Tests (xUnit)
+
+Eigenes Testprojekt **`TicketApplication.Tests`** (xUnit, wird nicht mit
+ausgeliefert; in Visual Studio über „Vorhandenes Projekt hinzufügen" in die
+Solution aufnehmen, Ausführung per Test-Explorer oder `dotnet test`).
+Getestet werden die isolierten Logikbausteine (~20 Testfälle):
+
+- `FileCrypto`: Roundtrip, Zufalls-Nonce, Manipulation und falscher Schlüssel
+  schlagen fehl, leerer Inhalt.
+- `NotInFutureAttribute` / `RequiresFieldAttribute`: gültige/ungültige Fälle,
+  null-Verhalten.
+- Passwort-Komplexitätsregel: parametrisierter Test direkt gegen die
+  produktive Regex am `RegisterDto`.
+- `AppConfigService.BuildConnectionString`: Windows-/SQL-Auth, Sonderzeichen
+  im Passwort, TrustServerCertificate.
+- `SmtpSettings.IsUsable`: alle Kombinationen.
+- `LogService`: Datei-Ausgabe (Bereich+Datum), Debug schreibt nichts ohne
+  Debug-Modus, Cleanup löscht nur Dateien älter 60 Tage.
+
+Controller werden bewusst nicht per Unit-Test abgedeckt (bräuchten DB +
+HTTP-Kontext) – Integrationstests stehen im Ausblick.
 
 ### 2.6 E-Mail / SMTP
 
@@ -416,11 +446,22 @@ Bearbeiter** aus (außer Autor), sofern SMTP aktiv.
 `SubjectController`, `ProblemController`, `MetadataController`,
 `DashboardController` – unverändert wie zuvor dokumentiert.
 
+### 8.10 `DepartmentController` (`api/department`, nur Admin)
+Abteilungsverwaltung (Stammdaten):
+- `GET /` – alle Abteilungen mit Nutzungszählern (Benutzer/Tickets/Themen).
+- `POST /` – anlegen (Name Pflicht, 2–100 Zeichen, eindeutig).
+- `PUT {id}` – umbenennen (Eindeutigkeit geprüft).
+- `DELETE {id}` – nur möglich, wenn **keine** Benutzer, Tickets, Themen oder
+  Wissensartikel zugeordnet sind; sonst 400 mit Zähler-Meldung.
+Alle Änderungen werden ins `einstellungen`-Log geschrieben.
+
 ### 8.9 `StatisticsController` (`api/statistics`, nur Admin)
 Alle drei Endpunkte (`agents`, `customers`, `departments`) akzeptieren jetzt
 optional **`?days=30|60`** (leer = Gesamt): Tickets werden nach
 **Erstelldatum**, Zeiteinträge nach **Arbeitsdatum** im Zeitraum gefiltert
 (Zeiten auf älteren Tickets zählen mit).
+`customers` listet nur Benutzer mit **Rolle `User`** – Ersteller, deren Rolle
+inzwischen auf Support/Admin geändert wurde, erscheinen nicht als Kunden.
 
 ---
 
@@ -446,7 +487,7 @@ Status/Prio-Tabellen). Sidebar-Änderungen:
 | `TicketErstellen.html` | nur User | 5-Schritt-Assistent; **Zusatzkontakte werden mitgesendet**, **Anhänge werden nach dem Erstellen automatisch hochgeladen**, **Referenz (Ticketnummer + Kommentar)**; beim Absenden **Sammelmeldung aller fehlenden Pflichtfelder inkl. Schritt-Angabe**. |
 | `problemMelden.html` | öffentlich + eingeloggt | Standalone-Problemformular. |
 | `probleme.html` | Admin | Problemmeldungen; **Löschen-Button in eigener Spalte ganz rechts**. |
-| `themen.html` | Staff | Themen verifizieren/löschen. |
+| `themen.html` | Staff | **„Abteilungen und Themen"**: Admin verwaltet oben die Abteilungen (anlegen/umbenennen/löschen mit Löschschutz + Nutzungszählern), darunter für Staff die Themen-Verifizierung. |
 | `ticket.html` | alle | Detail: Chat, Anhänge, Referenz-Anzeige (Link), Staff: Status/Zuweisung/Zeit; Reopen mit Pflicht-Nachricht. |
 | `kanban.html` | Staff | Drag&Drop-Board; Zeitraum Gesamt/60/30 Tage (nach letztem Update). |
 | `statistik.html` | Admin | Diagramme + Tabellen; **Zeitraum-Umschalter Gesamt / 60 / 30 Tage** (Server-seitig via `?days=`). |
@@ -552,6 +593,23 @@ Status/Prio-Tabellen). Sidebar-Änderungen:
 - Neue Pakete: `MailKit`, `System.Security.Cryptography.ProtectedData`.
 - **Schema-Änderungen** (lokale DB einmal löschen!): `User.MustChangePassword`,
   `User.EmailConfirmed`, `User.EmailConfirmToken`, Tabelle `AppSettings`.
+
+### Ausbau 10 – Tests, Stammdaten, Logging-Ausbau
+- **xUnit-Testprojekt** `TicketApplication.Tests` (~20 Tests, siehe Kapitel 2.7);
+  Hauptprojekt schließt den Test-Ordner vom eigenen Build aus.
+- **Setup/Einstellungen:** „(empfohlen)" bei der Anmeldeart entfernt; stattdessen
+  Info-Icon mit Hover-Tooltip (wann Windows-Auth, wann SQL-Login sinnvoll ist).
+- **Abteilungsverwaltung:** neuer `DepartmentController` (Admin-CRUD mit
+  Löschschutz + Nutzungszählern); Seite „Themen" umgebaut zu
+  **„Abteilungen und Themen"** (Abteilungs-Karte nur für Admins sichtbar);
+  Sidebar-Label angepasst.
+- **Logging-Umbau:** Development → Konsole, Production → Dateien;
+  neuer **Debug-Modus** (Einstellungen-Seite, geschützte Config) mit
+  technischen Logs: `http`-Bereich (Requests mit Dauer), SMTP-Schritte,
+  Queue-Ereignisse, Start-Diagnose. `LogService.Debug(...)` schreibt nur bei
+  aktivem Modus.
+- **Beispiel-Logs** (fiktive Daten) für die Präsentation unter
+  `Praesentation/Beispiel-Logs/`.
 
 ---
 

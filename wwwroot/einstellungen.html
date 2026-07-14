@@ -9,6 +9,23 @@
         .zeile2 { display: flex; gap: 12px; }
         .zeile2 > div { flex: 1; }
         h3 { margin-top: 0; color: #2c3e50; }
+
+        /* info-icon mit hover-tooltip */
+        .info {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 17px; height: 17px; border-radius: 50%;
+            background: #2c3e50; color: white; font-size: 12px; font-style: italic;
+            font-family: Georgia, serif; cursor: help; position: relative;
+            vertical-align: middle; margin-left: 6px;
+        }
+        .info .tooltip {
+            display: none; position: absolute; left: 24px; top: -8px; z-index: 5;
+            width: 320px; background: #2c3e50; color: white;
+            font-size: 12.5px; font-style: normal; font-family: 'Segoe UI', Arial, sans-serif;
+            font-weight: normal; padding: 10px 14px; border-radius: 8px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.3); line-height: 1.5;
+        }
+        .info:hover .tooltip { display: block; }
     </style>
 </head>
 <body>
@@ -71,7 +88,12 @@
             <h3>Logging</h3>
             <label>Log-Verzeichnis</label>
             <input type="text" id="logPfad">
-            <p class="mini">Pro Funktionsbereich und Tag eine Datei. Logs älter als 60 Tage werden automatisch gelöscht.</p>
+            <label style="font-weight:normal; margin-top:10px;">
+                <input type="checkbox" id="logDebug" style="width:auto;">
+                Debug-Logging (detaillierte technische Logs: Requests mit Dauer, SMTP-Verbindungsschritte, Queue-Ereignisse)
+            </label>
+            <p class="mini">Pro Funktionsbereich und Tag eine Datei. Logs älter als 60 Tage werden automatisch gelöscht.
+               Im Development-Modus gehen alle Logs in die Konsole statt in Dateien.</p>
             <button class="btn-gruen" onclick="logPfadSpeichern()">Speichern</button>
             <span id="logFeedback" class="mini"></span>
         </div>
@@ -87,7 +109,16 @@
             <input type="text" id="dServer">
             <label>Datenbankname</label>
             <input type="text" id="dDatenbank">
-            <label>Anmeldung</label>
+            <label>Anmeldung
+                <span class="info">i
+                    <span class="tooltip">
+                        <b>Windows-Anmeldung:</b> nutzt das Windows-Konto, unter dem die Anwendung läuft –
+                        kein Passwort in der Konfiguration.<br><br>
+                        <b>SQL-Server-Benutzer:</b> eigenes Login direkt am SQL Server. Sinnvoll bei
+                        Betrieb als Windows-Dienst oder entferntem SQL Server.
+                    </span>
+                </span>
+            </label>
             <select id="dAuthArt" onchange="dAuthUmschalten()">
                 <option value="windows">Windows-Anmeldung</option>
                 <option value="sql">SQL-Server-Benutzer</option>
@@ -177,6 +208,7 @@
             try {
                 const s = await api('/api/settings/system');
                 document.getElementById('logPfad').value = s.logPath;
+                document.getElementById('logDebug').checked = s.debugLogging;
                 document.getElementById('dServer').value = s.dbServer;
                 document.getElementById('dDatenbank').value = s.dbDatabase;
                 document.getElementById('dAuthArt').value = s.dbUseWindowsAuth ? 'windows' : 'sql';
@@ -186,13 +218,17 @@
             } catch (e) { fb('dbFeedback', e.message, false); }
         }
 
-        // log-pfad speichern
+        // logging-einstellungen speichern (pfad + debug-modus)
         async function logPfadSpeichern() {
             const pfad = document.getElementById('logPfad').value.trim();
+            const debug = document.getElementById('logDebug').checked;
             if (!pfad) { fb('logFeedback', 'Bitte einen Pfad angeben.', false); return; }
             try {
-                await api('/api/settings/logpath', { method: 'PUT', body: JSON.stringify({ logPath: pfad }) });
-                fb('logFeedback', 'Gespeichert. Neue Logs landen ab sofort dort.', true);
+                await api('/api/settings/logpath', {
+                    method: 'PUT',
+                    body: JSON.stringify({ logPath: pfad, debugLogging: debug })
+                });
+                fb('logFeedback', 'Gespeichert. Gilt ab sofort.', true);
             } catch (e) { fb('logFeedback', e.message, false); }
         }
 

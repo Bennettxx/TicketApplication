@@ -97,6 +97,7 @@ namespace TicketApplication.Controllers
             return Ok(new SystemSettingsDto
             {
                 LogPath = _config.LogPath,
+                DebugLogging = _config.DebugLogging,
                 DbServer = db?.Server ?? string.Empty,
                 DbDatabase = db?.Database ?? string.Empty,
                 DbUseWindowsAuth = db?.UseWindowsAuth ?? true,
@@ -105,7 +106,7 @@ namespace TicketApplication.Controllers
             });
         }
 
-        // PUT api/settings/logpath — log-verzeichnis ändern (mit schreibtest)
+        // PUT api/settings/logpath — log-verzeichnis + debug-modus ändern (mit schreibtest)
         [HttpPut("logpath")]
         public IActionResult SaveLogPath(LogPathDto dto)
         {
@@ -123,7 +124,9 @@ namespace TicketApplication.Controllers
             }
 
             _config.SaveLogPath(pfad);
-            _log.Info(LogBereich.Einstellungen, $"Log-Pfad geändert auf '{pfad}' durch {CurrentUserEmail}.");
+            _config.SaveDebugLogging(dto.DebugLogging);
+            _log.Info(LogBereich.Einstellungen,
+                $"Logging geändert durch {CurrentUserEmail}: Pfad='{pfad}', Debug={(dto.DebugLogging ? "an" : "aus")}.");
             return NoContent();
         }
 

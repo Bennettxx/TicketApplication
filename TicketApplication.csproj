@@ -36,4 +36,12 @@
     <None Include="wwwroot\index.html" />
   </ItemGroup>
 
+  <!-- testprojekt liegt im unterordner und darf nicht ins hauptprojekt kompiliert werden -->
+  <ItemGroup>
+    <Compile Remove="TicketApplication.Tests\**" />
+    <Content Remove="TicketApplication.Tests\**" />
+    <None Remove="TicketApplication.Tests\**" />
+    <EmbeddedResource Remove="TicketApplication.Tests\**" />
+  </ItemGroup>
+
 </Project>

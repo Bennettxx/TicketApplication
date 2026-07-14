@@ -110,6 +110,19 @@ app.Use(async (context, next) =>
     }
 });
 
+// technisches request-log (nur bei aktivem debug-modus): methode, pfad, status, dauer
+app.Use(async (context, next) =>
+{
+    var sw = System.Diagnostics.Stopwatch.StartNew();
+    await next();
+    sw.Stop();
+    if (context.Request.Path.StartsWithSegments("/api"))
+    {
+        logService.Debug(LogBereich.Http,
+            $"{context.Request.Method} {context.Request.Path}{context.Request.QueryString} -> {context.Response.StatusCode} ({sw.ElapsedMilliseconds} ms)");
+    }
+});
+
 // api-doku nur im dev-modus
 if (app.Environment.IsDevelopment())
 {
@@ -230,6 +243,8 @@ if (appConfig.IsConfigured)
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         DbInitializer.Initialize(context, app.Environment.IsDevelopment());
         logService.Info(LogBereich.App, "Anwendung gestartet, Datenbank initialisiert.");
+        logService.Debug(LogBereich.App,
+            $"Umgebung={app.Environment.EnvironmentName}, LogPath={appConfig.LogPath}, DebugLogging=an, LegacyConfig={appConfig.IsLegacyFallback}");
     }
     catch (Exception ex)
     {
