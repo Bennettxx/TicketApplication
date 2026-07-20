@@ -1,7 +1,7 @@
 # Ticket-Application – Entwickler-Wiki
 
 Vollständige Dokumentation der Anwendung im Wiki-Stil: pro Klasse/Datei wird
-beschrieben, welcher Teil welche Aufgabe hat und **was genau dort geschieht**.
+beschrieben, welcher Teil welche Aufgabe hat und was genau dort geschieht.
 Die Kapitel 3–9 bilden den aktuellen Stand des Codes ab; Kapitel 11 enthält die
 Entwicklungshistorie (was wann hinzugekommen ist).
 
@@ -40,7 +40,7 @@ Lokal laufendes Ticket-System.
 
 | Rolle     | Rechte |
 |-----------|--------|
-| `User`    | **Als Einzige Tickets erstellen** (eigene sehen, im Ticket chatten, Anhänge hochladen, Lösungsvorschläge erhalten, Problem melden). |
+| `User`    | Als Einziger Tickets erstellen (eigene sehen, im Ticket chatten, Anhänge hochladen, Lösungsvorschläge erhalten, Problem melden). |
 | `Support` | Alle Tickets sehen/bearbeiten, Kanban, Status/Zuweisung, Zeiterfassung, interne Notizen, Wissensdatenbank/Themen pflegen, Problem melden – aber **kein** Erstellen von Tickets. |
 | `Admin`   | Alles wie Support **plus** Benutzerverwaltung, Statistik, Problemmeldungs-Verwaltung und **Systemeinstellungen** (SMTP, DB-Verbindung, Log-Pfad). „Problem melden" ist für Admins ausgeblendet. |
 

@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Scalar.AspNetCore;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -70,7 +69,6 @@ builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
 });
 
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();
 
 // jwt-bearer auth, token wird gegen key/issuer/audience geprüft
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -122,13 +120,6 @@ app.Use(async (context, next) =>
             $"{context.Request.Method} {context.Request.Path}{context.Request.QueryString} -> {context.Response.StatusCode} ({sw.ElapsedMilliseconds} ms)");
     }
 });
-
-// api-doku nur im dev-modus
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-    app.MapScalarApiReference();
-}
 
 app.UseHttpsRedirection();
 
