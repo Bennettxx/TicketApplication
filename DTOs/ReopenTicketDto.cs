@@ -2,9 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace TicketApplication.DTOs
 {
-    // Eingangs-DTO für das Wiedereröffnen eines geschlossenen Tickets.
-    // Die Nachricht ist PFLICHT (Begründung, warum wieder geöffnet wird) und
-    // wird als Dialog-Nachricht am Ticket gespeichert.
+    // eingang fürs wiedereröffnen, begründung ist pflicht und landet im dialog
     public class ReopenTicketDto
     {
         [Required(ErrorMessage = "Eine Nachricht ist beim Wiedereröffnen erforderlich.")]

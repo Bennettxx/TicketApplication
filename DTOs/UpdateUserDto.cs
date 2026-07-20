@@ -5,9 +5,7 @@ using TicketApplication.Models;
 
 namespace TicketApplication.DTOs
 {
-    // Partielles Update durch einen Admin: Jedes Feld ist OPTIONAL.
-    // Nur gesetzte (nicht-null) Felder werden im Controller übernommen.
-    // Deshalb KEIN [Required] hier – sonst müsste man immer alle Felder mitschicken.
+    // teilupdate durch den admin, nur gesetzte felder werden übernommen
     public class UpdateUserDto
     {
         [MaxLength(50, ErrorMessage = "Vorname darf maximal 50 Zeichen lang sein.")]
@@ -22,7 +20,6 @@ namespace TicketApplication.DTOs
         [EnumDataType(typeof(UserRole), ErrorMessage = "Ungültige Rolle.")]
         public UserRole? Role { get; set; }
 
-        // Optionale Abteilung (muss existieren, wenn gesetzt).
         [ExistsInColumn(typeof(Department), "Name", ErrorMessage = "Abteilung nicht gefunden.")]
         public string? DepartmentName { get; set; }
 

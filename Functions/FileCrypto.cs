@@ -2,19 +2,15 @@ using System.Security.Cryptography;
 
 namespace TicketApplication.Functions
 {
-    // Symmetrische Verschlüsselung (AES-GCM) für private Datei-Anhänge.
-    // AES-GCM liefert Vertraulichkeit UND Integrität (authentifiziert).
-    //
-    // Speicherformat (alles in einem Base64-String):
-    //   nonce (12 Byte) | tag (16 Byte) | ciphertext (= Klartextlänge)
-    //
-    // Der Schlüssel (32 Byte) kommt aus der Konfiguration "Attachments:Key"
-    // und wird beim ersten Start automatisch erzeugt (siehe Program.cs).
+    // aes-gcm für private anhänge, liefert vertraulichkeit + integrität
+    // speicherformat als base64: nonce(12) | tag(16) | ciphertext
+    // key (32 byte) kommt aus "Attachments:Key", wird beim ersten start erzeugt
     public static class FileCrypto
     {
-        private const int NonceSize = 12; // 96 Bit, Standard für AES-GCM
-        private const int TagSize = 16;   // 128 Bit Auth-Tag
+        private const int NonceSize = 12;
+        private const int TagSize = 16;
 
+        // verschlüsselt und packt nonce+tag+ciphertext in einen base64-string
         public static string Encrypt(byte[] plaintext, byte[] key)
         {
             var nonce = RandomNumberGenerator.GetBytes(NonceSize);
@@ -31,6 +27,7 @@ namespace TicketApplication.Functions
             return Convert.ToBase64String(result);
         }
 
+        // gegenstück zu Encrypt, wirft bei manipulierten daten
         public static byte[] Decrypt(string base64, byte[] key)
         {
             var data = Convert.FromBase64String(base64);

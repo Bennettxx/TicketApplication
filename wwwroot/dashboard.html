@@ -37,11 +37,13 @@
 
     <script src="/app.js"></script>
     <script>
+        // seite aufbauen
         (async function () {
             await seitenleisteAufbauen('dashboard');
             await dashboardLaden();
         })();
 
+        // kennzahlen laden, kacheln + letzte tickets rendern
         async function dashboardLaden() {
             try {
                 const d = await api('/api/dashboard');

@@ -47,14 +47,21 @@
 
     <script src="/app.js"></script>
     <script>
+        // seite aufbauen, felder vorbefüllen; abteilung nur für rolle user
         (async function () {
             await seitenleisteAufbauen('profil');
             const mich = await getMich();
+
+            // zwangswechsel nach erstem login mit dem standard-admin
+            if (new URLSearchParams(window.location.search).get('pwzwang') === '1') {
+                const fb = document.getElementById('pwFeedback');
+                fb.textContent = 'Bitte jetzt das Passwort ändern - erst danach ist die Anwendung nutzbar.';
+                fb.className = 'feedback-rot';
+            }
             document.getElementById('vorname').value = mich.firstName || '';
             document.getElementById('nachname').value = mich.secondName || '';
             document.getElementById('email').value = mich.email || '';
 
-            // Abteilung nur für Rolle User anzeigen/änderbar (Admin/Support haben keine).
             if (mich.role === 'User') {
                 document.getElementById('abteilungBox').style.display = 'block';
                 try {
@@ -66,10 +73,11 @@
                         if (a.name === mich.departmentName) o.selected = true;
                         sel.appendChild(o);
                     });
-                } catch { /* ignore */ }
+                } catch { }
             }
         })();
 
+        // stammdaten speichern
         async function profilSpeichern() {
             const fb = document.getElementById('profilFeedback');
             const mich = await getMich();
@@ -80,7 +88,6 @@
             if (!body.firstName || !body.secondName) {
                 fb.textContent = 'Vor- und Nachname sind Pflicht.'; return;
             }
-            // Abteilung nur mitschicken, wenn User.
             if (mich.role === 'User') {
                 const abt = document.getElementById('abteilung').value;
                 if (!abt) { fb.textContent = 'Bitte eine Abteilung wählen.'; return; }
@@ -89,11 +96,12 @@
             try {
                 await api('/api/account/me', { method: 'PUT', body: JSON.stringify(body) });
                 fb.textContent = 'Profil gespeichert.';
-                MICH = null; // Cache zurücksetzen, damit Name/Abteilung neu geladen werden
+                MICH = null; // cache leeren, damit sidebar/name neu laden
                 await seitenleisteAufbauen('profil');
             } catch (e) { fb.textContent = e.message; }
         }
 
+        // passwort ändern, neue eingaben müssen übereinstimmen
         async function passwortAendern() {
             const fb = document.getElementById('pwFeedback');
             const alt = document.getElementById('altPw').value;
@@ -107,9 +115,14 @@
                     body: JSON.stringify({ oldPassword: alt, newPassword: neu })
                 });
                 fb.textContent = 'Passwort geändert.';
+                fb.className = 'feedback-gruen';
                 document.getElementById('altPw').value = '';
                 document.getElementById('neuPw').value = '';
                 document.getElementById('neuPw2').value = '';
+                // nach zwangswechsel weiter zur startseite
+                if (new URLSearchParams(window.location.search).get('pwzwang') === '1') {
+                    setTimeout(() => { window.location.href = '/dashboard.html'; }, 1200);
+                }
             } catch (e) { fb.textContent = e.message; }
         }
     </script>

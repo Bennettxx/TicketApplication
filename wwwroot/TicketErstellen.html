@@ -1,13 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <title>Ticket erstellen</title>
-    <!-- style.css zuerst, damit die folgenden Seiten-eigenen Styles bei
-         Konflikten Vorrang behalten; liefert die Dropdown-Sidebar-Klassen. -->
     <link rel="stylesheet" href="/style.css">
     <style>
-        /* Grundlayout */
         body {
             font-family: Arial;
             display: flex;
@@ -15,7 +12,6 @@
             background: #D3D3D3;
         }
 
-        /* Linke Sidebar */
         .sidebar {
             width: 220px;
             background: #2c3e50;
@@ -48,13 +44,11 @@
                 margin-top: auto;
             }
 
-        /* Hauptbereich */
         .main {
             flex: 1;
             padding: 30px;
         }
 
-        /* Benutzername oben rechts */
         .benutzer {
             position: absolute;
             top: 15px;
@@ -67,7 +61,6 @@
             color: #2c3e50;
         }
 
-        /* Weiße Karte */
         .karte {
             background: white;
             border-radius: 15px;
@@ -76,7 +69,6 @@
             min-height: 500px;
         }
 
-        /* Linke Schritte-Leiste */
         .schritte {
             width: 180px;
             background: #f5f5f5;
@@ -84,7 +76,6 @@
             padding: 20px;
         }
 
-        /* Einzelner Schritt in der linken Leiste */
         .schritt {
             padding: 12px 10px;
             margin: 5px 0;
@@ -94,30 +85,22 @@
             cursor: default;
         }
 
-        
-
-            /* Aktiver Schritt – wird hervorgehoben */
             .schritt.aktiv {
                 background: #2c3e50;
                 color: white;
                 font-weight: bold;
             }
 
-           
-
-        /* Rechter Inhaltsbereich */
         .inhalt {
             flex: 1;
             padding: 30px;
         }
 
-            /* Überschrift des aktuellen Schritts */
             .inhalt h2 {
                 margin-top: 0;
                 color: #2c3e50;
             }
 
-        /* Beschriftung über Eingabefeld */
         label {
             display: block;
             margin-top: 15px;
@@ -126,7 +109,6 @@
             color: #2c3e50;
         }
 
-        /* Alle Eingabefelder gleich */
         input, textarea, select {
             width: 100%;
             padding: 10px;
@@ -137,7 +119,6 @@
             box-sizing: border-box;
         }
 
-        /* Zwei Felder nebeneinander */
         .zeile {
             display: flex;
             gap: 15px;
@@ -147,7 +128,6 @@
                 flex: 1;
             }
 
-        /* Radio-Button Gruppe für Priorität */
         .radio-gruppe {
             display: flex;
             flex-direction: column;
@@ -165,7 +145,6 @@
             cursor: pointer;
         }
 
-            /* Priorität Farben */
             .radio-option.low {
                 border-color: #28a745;
             }
@@ -183,7 +162,6 @@
                 cursor: pointer;
             }
 
-        /* Tabs für Schritt 3 */
         .tabs {
             display: flex;
             gap: 10px;
@@ -196,19 +174,17 @@
             border-radius: 8px;
             cursor: pointer;
             background: white;
-            /* !important, damit die weiße Button-Schrift aus style.css NIE gewinnt */
+            /* !important, sonst gewinnt die weiße button-schrift aus style.css */
             color: #2c3e50 !important;
             font-size: 14px;
         }
 
-            /* Aktiver Tab */
             .tabs .tab.aktiv {
                 background: #2c3e50;
                 color: white !important;
                 border-color: #2c3e50;
             }
 
-        /* Textbereich für Tabs */
         .tab-inhalt {
             display: none;
         }
@@ -222,7 +198,6 @@
             resize: vertical;
         }
 
-        /* Zusätzliche Kontakte */
         .kontakt-liste {
             margin-top: 10px;
         }
@@ -238,7 +213,6 @@
                 flex: 1;
             }
 
-        /* Plus Button für Kontakt hinzufügen */
         .btn-plus {
             padding: 8px 15px;
             background: #2c3e50;
@@ -249,7 +223,6 @@
             font-size: 18px;
         }
 
-        /* Löschen Button für Kontakt */
         .btn-loeschen {
             padding: 8px 12px;
             background: #dc3545;
@@ -259,7 +232,6 @@
             cursor: pointer;
         }
 
-        /* Anhang Bereich – sieht aus als ob es funktioniert */
         .anhang-bereich {
             display: flex;
             gap: 10px;
@@ -289,14 +261,12 @@
             cursor: pointer;
         }
 
-        /* Referenz Bereich */
         .referenz-zeile {
             display: flex;
             gap: 10px;
             margin-top: 10px;
         }
 
-        /* Checkbox Bereich für Schritt 5 */
         .checkbox-option {
             display: flex;
             align-items: flex-start;
@@ -314,7 +284,6 @@
                 cursor: pointer;
             }
 
-        /* Buttons unten */
         .buttons {
             display: flex;
             justify-content: space-between;
@@ -349,7 +318,6 @@
             background: #5a6268;
         }
 
-        /* Fehlermeldung */
         #feedback {
             margin-top: 10px;
             font-weight: bold;
@@ -358,21 +326,16 @@
 </head>
 <body>
 
-    <!-- Linke Sidebar (wird per app.js als Dropdown-Menü befüllt) -->
     <div class="sidebar" id="sidebar"></div>
 
-    <!-- Hauptbereich -->
     <div class="main">
 
-        <!-- Benutzername oben rechts -->
         <span class="benutzer" id="benutzername">...</span>
 
         <h1>Neues Ticket erstellen</h1>
 
-        <!-- Weiße Karte mit Schritten -->
         <div class="karte">
 
-            <!-- Linke Schritte-Leiste -->
             <div class="schritte">
                 <div class="schritt aktiv" id="nav-1" onclick="schrittwechseln(1)">1. Kontakt</div>
                 <div class="schritt" id="nav-2" onclick="schrittwechseln(2)">2. Klassifizierung</div>
@@ -381,10 +344,9 @@
                 <div class="schritt" id="nav-5" onclick="schrittwechseln(5)">5. Informationen</div>
             </div>
 
-            <!-- Rechter Inhaltsbereich – hier wird der aktuelle Schritt angezeigt -->
             <div class="inhalt">
 
-                <!-- ===== SCHRITT 1: KONTAKT ===== -->
+                <!-- schritt 1: kontakt -->
                 <div id="schritt-1">
                     <h2>Kontakt</h2>
 
@@ -393,7 +355,6 @@
                         automatisch übernommen.
                     </p>
 
-                    <!-- Vorname und Nachname nebeneinander – aus dem Konto, gesperrt -->
                     <div class="zeile">
                         <div>
                             <label>Vorname</label>
@@ -408,29 +369,23 @@
                     <label>E-Mail Adresse</label>
                     <input type="email" id="email" readonly style="background:#eee; cursor:not-allowed">
 
-                    <!-- Zusätzliche Kontakte -->
-                    <label>Zusätzliche Kontakte</label>
+                    <label>Zusätzliche Kontakte (max. 3)</label>
                     <p style="color:gray; font-size:13px; margin:0">
                         Weitere Kollegen die benachrichtigt werden sollen:
                     </p>
 
-                    <!-- Container für zusätzliche Kontakte -->
                     <div class="kontakt-liste" id="kontaktListe">
-                        <!-- Erster Kontakt -->
                         <div class="kontakt-eintrag">
                             <input type="email" placeholder="kollege@firma.com">
-                            <!-- Plus Button fügt neues Feld hinzu -->
                             <button class="btn-plus" onclick="kontaktHinzufuegen()">+</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- ===== SCHRITT 2: KLASSIFIZIERUNG ===== -->
-                <!-- display:none bedeutet versteckt – wird sichtbar wenn User auf Weiter klickt -->
+                <!-- schritt 2: klassifizierung -->
                 <div id="schritt-2" style="display:none">
                     <h2>Klassifizierung</h2>
 
-                    <!-- Priorität als Radio-Buttons -->
                     <label>Priorität</label>
                     <div class="radio-gruppe">
                         <label class="radio-option low">
@@ -462,14 +417,11 @@
                         </label>
                     </div>
 
-                    <!-- Abteilung als Auswahl (vom Backend geladen) -->
                     <label>Abteilung</label>
                     <select id="abteilung" onchange="subjectsLaden()">
                         <option value="">Bitte wählen...</option>
                     </select>
 
-                    <!-- Komponente / Thema: verifizierte Themen als Auswahl,
-                         freie Eingabe neuer Themen weiterhin möglich (datalist). -->
                     <label>Komponente / Thema</label>
                     <input type="text" id="komponente" list="subjectListe"
                            placeholder="Thema wählen oder neu eingeben">
@@ -479,7 +431,7 @@
                     </p>
                 </div>
 
-                <!-- ===== SCHRITT 3: BESCHREIBUNG ===== -->
+                <!-- schritt 3: beschreibung -->
                 <div id="schritt-3" style="display:none">
                     <h2>Beschreibung</h2>
 
@@ -487,12 +439,9 @@
                     <input type="text" id="titel" placeholder="Kurze prägnante Beschreibung des Problems"
                            oninput="vorschlaegeLaden()">
 
-                    <!-- Lösungsvorschläge aus der Wissensdatenbank -->
                     <div id="vorschlaege" style="margin-top:10px;"></div>
 
-                    <!-- 3 Tabs: Szenario, Erwartetes Ergebnis, Aktuelles Ergebnis -->
                     <div class="tabs" style="margin-top:20px">
-                        <!-- onclick wechselt den aktiven Tab -->
                         <button class="tab aktiv" onclick="tabWechseln('szenario')">
                             Szenario
                         </button>
@@ -504,72 +453,61 @@
                         </button>
                     </div>
 
-                    <!-- Jeder Tab hat ein eigenes Textfeld -->
-                    <!-- Nur der aktive Tab ist sichtbar -->
                     <div class="tab-inhalt aktiv" id="tab-szenario">
-                        <textarea id="szenario"
-                                  placeholder="Was hast du gemacht? Bei welchem Vorgang ist es passiert?">
-                        </textarea>
+                        <textarea id="szenario" placeholder="Was hast du gemacht? Bei welchem Vorgang ist es passiert?"></textarea>
                     </div>
                     <div class="tab-inhalt" id="tab-erwartet">
-                        <textarea id="erwartet"
-                                  placeholder="Was hättest du erwartet dass passiert?">
-                        </textarea>
+                        <textarea id="erwartet" placeholder="Was hättest du erwartet dass passiert?"></textarea>
                     </div>
                     <div class="tab-inhalt" id="tab-aktuell">
-                        <textarea id="aktuell"
-                                  placeholder="Was ist stattdessen passiert?">
-                        </textarea>
+                        <textarea id="aktuell" placeholder="Was ist stattdessen passiert?"></textarea>
                     </div>
                 </div>
 
-                <!-- ===== SCHRITT 4: REFERENZ & ANHÄNGE ===== -->
+                <!-- schritt 4: referenz + anhänge -->
                 <div id="schritt-4" style="display:none">
                     <h2>Referenz & Anhänge</h2>
 
-                    <!-- Referenz: Ticketnummer + Kommentar -->
-                    <label>Referenz hinzufügen</label>
+                    <label>Referenz hinzufügen (optional)</label>
                     <div class="referenz-zeile">
-                        <input type="text" id="refTicket" placeholder="Ticketnummer">
-                        <input type="text" id="refKommentar" placeholder="Kommentar">
+                        <input type="number" id="refTicket" min="1" placeholder="Ticketnummer">
+                        <input type="text" id="refKommentar" maxlength="500" placeholder="Kommentar">
                     </div>
 
-                    <!-- Anhang – sieht aus als ob es funktioniert -->
                     <label>Anhang hinzufügen</label>
                     <div class="anhang-bereich">
                         <input type="text" id="anhangName" placeholder="Dateiname..." readonly>
-                        <!-- Browse öffnet Dateiauswahl – aber wir speichern nichts -->
                         <input type="file" id="anhangFile" style="display:none"
                                onchange="dateiGewaehlt()">
                         <button class="btn-browse" onclick="document.getElementById('anhangFile').click()">
                             Browse
                         </button>
                         <button class="btn-upload" onclick="anhangHinzufuegen()">
-                            Upload
+                            Hinzufügen
                         </button>
                     </div>
 
-                    <!-- Checkbox: Persönliche Daten im File -->
                     <label class="checkbox-option" style="margin-top:15px">
                         <input type="checkbox" id="persoenlicheDaten">
-                        <span>Persönliche Daten im File?</span>
+                        <span>Persönliche Daten im File? (wird verschlüsselt gespeichert)</span>
                     </label>
 
-                    <!-- Liste der hochgeladenen Anhänge -->
                     <label>Hinzugefügte Anhänge</label>
+                    <p style="color:gray; font-size:12px; margin:0">
+                        Die Dateien werden nach dem Absenden automatisch am Ticket hochgeladen (max. 5 MB pro Datei).
+                    </p>
                     <div id="anhangListe" style="color:gray; font-size:13px">
                         Noch keine Anhänge hinzugefügt.
                     </div>
                 </div>
 
-                <!-- ===== SCHRITT 5: INFORMATIONEN ===== -->
+                <!-- schritt 5: bestätigungen -->
                 <div id="schritt-5" style="display:none">
                     <h2>Informationen</h2>
                     <p style="color:gray">
                         Bitte lies folgende Punkte sorgfältig durch und stimme zu:
                     </p>
 
-                    <!-- Checkbox 1: Kosten -->
                     <label class="checkbox-option">
                         <input type="checkbox" id="agreeBilling">
                         <div>
@@ -580,7 +518,6 @@
                         </div>
                     </label>
 
-                    <!-- Checkbox 2: AGB -->
                     <label class="checkbox-option">
                         <input type="checkbox" id="agreeAgb">
                         <div>
@@ -592,10 +529,8 @@
                     </label>
                 </div>
 
-                <!-- Feedback Meldung -->
                 <p id="feedback"></p>
 
-                <!-- Buttons: Abbrechen und Weiter/Absenden -->
                 <div class="buttons">
                     <button class="btn-abbrechen" onclick="abbrechen()">Abbrechen</button>
                     <button class="btn-weiter" id="btn-weiter" onclick="weiter()">
@@ -609,27 +544,13 @@
 
     <script src="/app.js"></script>
     <script>
-        // Beim Laden der Seite prüfen ob der User eingeloggt ist
-        const token = localStorage.getItem('meinToken');
-        if (!token) {
-            window.location.href = '/index.html';
-        }
-
-        // Dropdown-Sidebar aufbauen (Menüpunkt "Ticket erstellen" aktiv)
+        // sidebar aufbauen, menüpunkt "ticket erstellen" aktiv
         seitenleisteAufbauen('erstellen');
 
-        // Benutzername laden
+        // kontaktfelder aus dem eigenen konto vorbefüllen (readonly)
         async function benutzerLaden() {
             try {
-                const response = await fetch('/api/user/me', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const ich = await response.json();
-                document.getElementById('benutzername').innerText = `👤 ${ich.email}`;
-
-                // Kontaktdaten automatisch aus dem eingeloggten Konto füllen.
-                // Die Felder sind readonly – der Ersteller wird ohnehin
-                // serverseitig aus dem JWT gesetzt (CreatedByUserId).
+                const ich = await getMich();
                 document.getElementById('vorname').value = ich.firstName || '';
                 document.getElementById('nachname').value = ich.secondName || '';
                 document.getElementById('email').value = ich.email || '';
@@ -639,17 +560,13 @@
         }
         benutzerLaden();
 
-        // Abteilungen vom Backend in die Auswahlliste laden.
-        // Das Backend akzeptiert nur existierende Abteilungsnamen, daher
-        // dürfen wir hier kein freies Textfeld verwenden.
-        const DEPT_MAP = {}; // Abteilungsname -> Id (für die Themen-Filterung)
+        // abteilungsname -> id, für die themen-filterung
+        const DEPT_MAP = {};
 
+        // abteilungen ins dropdown laden, backend akzeptiert nur existierende namen
         async function abteilungenLaden() {
             try {
-                const response = await fetch('/api/metadata/departments', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const abteilungen = await response.json();
+                const abteilungen = await api('/api/metadata/departments');
                 const sel = document.getElementById('abteilung');
                 abteilungen.forEach(a => {
                     DEPT_MAP[a.name] = a.id;
@@ -664,7 +581,7 @@
         }
         abteilungenLaden();
 
-        // Verifizierte Themen der gewählten Abteilung in die datalist laden.
+        // verifizierte themen der gewählten abteilung in die datalist laden
         async function subjectsLaden() {
             const abteilung = document.getElementById('abteilung').value;
             const datalist = document.getElementById('subjectListe');
@@ -672,11 +589,7 @@
             const depId = DEPT_MAP[abteilung];
             if (!depId) return;
             try {
-                const response = await fetch(
-                    `/api/metadata/subjects?verifiedOnly=true&departmentId=${depId}`,
-                    { headers: { 'Authorization': `Bearer ${token}` } });
-                if (!response.ok) return;
-                const subjects = await response.json();
+                const subjects = await api(`/api/metadata/subjects?verifiedOnly=true&departmentId=${depId}`);
                 subjects.forEach(s => {
                     const o = document.createElement('option');
                     o.value = s.title;
@@ -687,24 +600,20 @@
             }
         }
 
-        // ---- Lösungsvorschläge aus der Wissensdatenbank ----
-        // Beim Tippen des Titels passende Artikel vorschlagen (mit Debounce).
+        // lösungsvorschläge beim tippen des titels, mit debounce
         let vorschlagTimer = null;
         function vorschlaegeLaden() {
             clearTimeout(vorschlagTimer);
             vorschlagTimer = setTimeout(vorschlaegeAbrufen, 350);
         }
 
+        // wissensdatenbank abfragen und treffer anzeigen
         async function vorschlaegeAbrufen() {
             const titel = document.getElementById('titel').value.trim();
             const box = document.getElementById('vorschlaege');
             if (titel.length < 3) { box.innerHTML = ''; return; }
             try {
-                const res = await fetch('/api/knowledge/suggest?q=' + encodeURIComponent(titel), {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!res.ok) { box.innerHTML = ''; return; }
-                const treffer = await res.json();
+                const treffer = await api('/api/knowledge/suggest?q=' + encodeURIComponent(titel));
                 if (!treffer.length) { box.innerHTML = ''; return; }
 
                 box.innerHTML = `
@@ -714,62 +623,57 @@
                             <div style="margin-top:8px;">
                                 <a href="#" onclick="vorschlagToggle(${i}); return false;"
                                    style="color:#1a73e8; font-weight:bold; text-decoration:none;">
-                                   ${escHtml(t.title)}
+                                   ${esc(t.title)}
                                 </a>
                                 <div id="vsol-${i}" style="display:none; margin-top:4px; white-space:pre-wrap; color:#333;">
-                                    ${escHtml(t.solution)}
+                                    ${esc(t.solution)}
                                 </div>
                             </div>`).join('')}
                     </div>`;
             } catch { box.innerHTML = ''; }
         }
 
+        // lösungstext eines vorschlags ein-/ausklappen
         function vorschlagToggle(i) {
             const el = document.getElementById('vsol-' + i);
             el.style.display = el.style.display === 'none' ? 'block' : 'none';
         }
 
-        // Kleines HTML-Escaping (app.js hat 'esc', aber wir bleiben hier eigenständig)
-        function escHtml(s) {
-            return String(s || '')
-                .replaceAll('&', '&amp;').replaceAll('<', '&lt;')
-                .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-        }
-
-        // Aktueller Schritt – startet bei 1
+        // aktueller schritt im wizard
         let aktuellerSchritt = 1;
 
-        // Gespeicherte Anhänge Liste
+        // gemerkte anhänge: { file, persoenlich }
         let anhaenge = [];
 
-        // Wird aufgerufen wenn User auf "Weiter" klickt
+        // weiter-button: aktuellen schritt validieren, dann nächster schritt oder absenden
         function weiter() {
             const feedback = document.getElementById('feedback');
             feedback.innerHTML = '';
 
-            // Pflichtfelder des aktuellen Schritts prüfen
             if (aktuellerSchritt === 1) {
                 const vorname = document.getElementById('vorname').value;
                 const nachname = document.getElementById('nachname').value;
                 const email = document.getElementById('email').value;
 
-                // Prüfen ob alle Pflichtfelder ausgefüllt sind
                 if (!vorname || !nachname || !email) {
                     feedback.innerHTML =
                         `<span style="color:red">❌ Bitte alle Pflichtfelder ausfüllen!</span>`;
                     return;
                 }
+                if (kontakteSammeln().length > 3) {
+                    feedback.innerHTML =
+                        `<span style="color:red">❌ Maximal 3 zusätzliche Kontakte möglich!</span>`;
+                    return;
+                }
             }
 
             if (aktuellerSchritt === 2) {
-                // Prüfen ob eine Priorität ausgewählt wurde
                 const prioritaet = document.querySelector('input[name="prioritaet"]:checked');
                 if (!prioritaet) {
                     feedback.innerHTML =
                         `<span style="color:red">❌ Bitte eine Priorität auswählen!</span>`;
                     return;
                 }
-                // Abteilung und Thema sind Pflicht (Backend verlangt sie).
                 if (!document.getElementById('abteilung').value) {
                     feedback.innerHTML =
                         `<span style="color:red">❌ Bitte eine Abteilung wählen!</span>`;
@@ -793,59 +697,42 @@
             }
 
             if (aktuellerSchritt === 5) {
-                // Letzter Schritt – Ticket absenden
                 senden();
                 return;
             }
 
-            // Nächsten Schritt anzeigen
             schrittwechseln(aktuellerSchritt + 1);
         }
 
-        // Wechselt zum angegebenen Schritt
+        // schritt anzeigen, navigation und button-text anpassen
         function schrittwechseln(neuerSchritt) {
-            // Aktuellen Schritt verstecken
             document.getElementById(`schritt-${aktuellerSchritt}`).style.display = 'none';
-
-            // Aktuellen Schritt in der linken Leiste als erledigt markieren
             document.getElementById(`nav-${aktuellerSchritt}`).className = 'schritt';
 
-            // Neuen Schritt anzeigen
             aktuellerSchritt = neuerSchritt;
             document.getElementById(`schritt-${aktuellerSchritt}`).style.display = 'block';
-
-            // Neuen Schritt in der linken Leiste als aktiv markieren
             document.getElementById(`nav-${aktuellerSchritt}`).className = 'schritt aktiv';
 
-            // Button Text ändern wenn letzter Schritt
             if (aktuellerSchritt === 5) {
                 document.getElementById('btn-weiter').innerText = '✅ Absenden';
             } else {
                 document.getElementById('btn-weiter').innerText = 'Weiter →';
             }
 
-            // Feedback leeren
             document.getElementById('feedback').innerHTML = '';
         }
 
-        // Tab wechseln in Schritt 3
+        // tab in schritt 3 wechseln
         function tabWechseln(tabName) {
-            // Alle Tabs deaktivieren
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('aktiv'));
             document.querySelectorAll('.tab-inhalt').forEach(t => t.classList.remove('aktiv'));
-
-            // Gewählten Tab aktivieren
             document.getElementById(`tab-${tabName}`).classList.add('aktiv');
-
-            // Richtigen Button aktivieren
             event.target.classList.add('aktiv');
         }
 
-        // Neues Kontakt-Feld hinzufügen
+        // weiteres kontakt-eingabefeld anhängen
         function kontaktHinzufuegen() {
             const liste = document.getElementById('kontaktListe');
-
-            // Neues Eingabefeld erstellen
             const neuerEintrag = document.createElement('div');
             neuerEintrag.className = 'kontakt-eintrag';
             neuerEintrag.innerHTML = `
@@ -855,7 +742,14 @@
             liste.appendChild(neuerEintrag);
         }
 
-        // Datei wurde ausgewählt - zeigt den Dateinamen an
+        // eingegebene kontakt-mails einsammeln (ohne leere)
+        function kontakteSammeln() {
+            return Array.from(document.querySelectorAll('#kontaktListe input[type="email"]'))
+                .map(i => i.value.trim())
+                .filter(v => v);
+        }
+
+        // dateiname nach auswahl anzeigen
         function dateiGewaehlt() {
             const file = document.getElementById('anhangFile').files[0];
             if (file) {
@@ -863,22 +757,28 @@
             }
         }
 
-        // Anhang zur Liste hinzufügen
+        // gewählte datei in die anhangliste übernehmen
         function anhangHinzufuegen() {
-            const name = document.getElementById('anhangName').value;
-            if (!name) return;
+            const input = document.getElementById('anhangFile');
+            const file = input.files[0];
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) {
+                document.getElementById('feedback').innerHTML =
+                    `<span style="color:red">Datei zu groß (max. 5 MB).</span>`;
+                return;
+            }
 
             const persoenlich = document.getElementById('persoenlicheDaten').checked;
-            anhaenge.push({ name, persoenlich });
+            anhaenge.push({ file, persoenlich });
 
-            // Eingabefelder leeren und Liste neu zeichnen
             document.getElementById('anhangName').value = '';
-            document.getElementById('anhangFile').value = '';
+            input.value = '';
             document.getElementById('persoenlicheDaten').checked = false;
+            document.getElementById('feedback').innerHTML = '';
             anhangRender();
         }
 
-        // Zeichnet die Anhangliste neu (getrennt vom Hinzufügen!)
+        // anhangliste neu zeichnen
         function anhangRender() {
             const liste = document.getElementById('anhangListe');
             if (!anhaenge.length) {
@@ -888,7 +788,7 @@
             liste.innerHTML = anhaenge.map((a, i) => `
                 <div style="display:flex; gap:10px; align-items:center;
                             padding:8px; background:#f5f5f5; border-radius:8px; margin-top:5px">
-                    <span style="flex:1">${a.name}</span>
+                    <span style="flex:1">${esc(a.file.name)}</span>
                     <span style="color:${a.persoenlich ? 'red' : 'gray'}; font-size:12px">
                         ${a.persoenlich ? 'Persönlich' : ''}
                     </span>
@@ -897,29 +797,50 @@
             `).join('');
         }
 
-        // Anhang aus der Liste entfernen – nur splicen und neu zeichnen.
+        // anhang aus der liste entfernen
         function anhangLoeschen(index) {
             anhaenge.splice(index, 1);
             anhangRender();
         }
 
-        // Ticket ans Backend schicken
+        // alle pflichtfelder über alle schritte prüfen, liste der fehlenden zurückgeben
+        function fehlendePflichtfelder() {
+            const fehlt = [];
+            if (!document.querySelector('input[name="prioritaet"]:checked'))
+                fehlt.push('Priorität (Schritt 2)');
+            if (!document.getElementById('abteilung').value)
+                fehlt.push('Abteilung (Schritt 2)');
+            if (document.getElementById('komponente').value.trim().length < 2)
+                fehlt.push('Thema/Komponente, min. 2 Zeichen (Schritt 2)');
+            if (!document.getElementById('titel').value.trim())
+                fehlt.push('Titel (Schritt 3)');
+            if (!document.getElementById('szenario').value.trim())
+                fehlt.push('Szenario (Schritt 3)');
+            if (!document.getElementById('erwartet').value.trim())
+                fehlt.push('Erwartetes Ergebnis (Schritt 3)');
+            if (!document.getElementById('aktuell').value.trim())
+                fehlt.push('Aktuelles Ergebnis (Schritt 3)');
+            if (!document.getElementById('agreeBilling').checked)
+                fehlt.push('Kosten bestätigen (Schritt 5)');
+            if (!document.getElementById('agreeAgb').checked)
+                fehlt.push('AGB zustimmen (Schritt 5)');
+            if (kontakteSammeln().length > 3)
+                fehlt.push('Maximal 3 zusätzliche Kontakte (Schritt 1)');
+            return fehlt;
+        }
+
+        // ticket absenden, danach anhänge hochladen
         async function senden() {
             const feedback = document.getElementById('feedback');
 
-            // Beide Bestätigungen prüfen und ALLE fehlenden gesammelt anzeigen.
-            const fehlend = [];
-            if (!document.getElementById('agreeBilling').checked)
-                fehlend.push('Kosten bestätigen');
-            if (!document.getElementById('agreeAgb').checked)
-                fehlend.push('AGB zustimmen');
-            if (fehlend.length > 0) {
+            // sammelmeldung: alles fehlende auf einmal anzeigen
+            const fehlt = fehlendePflichtfelder();
+            if (fehlt.length > 0) {
                 feedback.innerHTML =
-                    `<span style="color:red">Bitte noch bestätigen: ${fehlend.join(' und ')}.</span>`;
+                    `<span style="color:red">Es fehlt noch:<br>• ${fehlt.join('<br>• ')}</span>`;
                 return;
             }
 
-            // Alle Daten sammeln
             const prioritaet = document.querySelector('input[name="prioritaet"]:checked').value;
             const titel = document.getElementById('titel').value;
             const szenario = document.getElementById('szenario').value.trim();
@@ -927,66 +848,69 @@
             const aktuell = document.getElementById('aktuell').value.trim();
             const abteilung = document.getElementById('abteilung').value;
             const komponente = document.getElementById('komponente').value.trim();
+            const kontakte = kontakteSammeln();
+            const refTicket = document.getElementById('refTicket').value.trim();
+            const refKommentar = document.getElementById('refKommentar').value.trim();
 
-            // Das Backend (CreateTicketDto) verlangt Beschreibung, erwartetes
-            // und aktuelles Ergebnis als Pflichtfelder.
-            if (!szenario || !erwartet || !aktuell) {
-                feedback.innerHTML =
-                    `<span style="color:red">Bitte Szenario, erwartetes und aktuelles Ergebnis (Schritt 3) ausfüllen!</span>`;
-                return;
-            }
+            // body passend zum CreateTicketDto
+            const body = {
+                priority: parseInt(prioritaet),
+                title: titel,
+                description: szenario,
+                expectedResult: erwartet,
+                actualResult: aktuell,
+                agreedBilling: document.getElementById('agreeBilling').checked,
+                agreedAGB: document.getElementById('agreeAgb').checked,
+                departmentName: abteilung,
+                subjectName: komponente,
+                assignedUserMail1: kontakte[0] || null,
+                assignedUserMail2: kontakte[1] || null,
+                assignedUserMail3: kontakte[2] || null,
+                referenceTicketId: refTicket ? parseInt(refTicket) : null,
+                referenceComment: refKommentar || null
+            };
 
             try {
-                // Ticket ans Backend schicken – Felder passend zum CreateTicketDto
-                const response = await fetch('/api/ticket', {
+                const ticket = await api('/api/ticket', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        priority: parseInt(prioritaet),
-                        title: titel,
-                        description: szenario,
-                        expectedResult: erwartet,
-                        actualResult: aktuell,
-                        agreedBilling: document.getElementById('agreeBilling').checked,
-                        agreedAGB: document.getElementById('agreeAgb').checked,
-                        departmentName: abteilung,
-                        subjectName: komponente
-                    })
+                    body: JSON.stringify(body)
                 });
 
-                if (response.ok) {
-                    // Erfolgsmeldung und zurück zur Startseite
+                // anhänge einzeln ans neue ticket hochladen
+                const fehlgeschlagen = [];
+                for (const a of anhaenge) {
+                    const form = new FormData();
+                    form.append('file', a.file);
+                    form.append('isPrivate', a.persoenlich);
+                    try {
+                        const res = await fetch(`/api/ticket/${ticket.id}/attachments`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${TOKEN}` },
+                            body: form
+                        });
+                        if (!res.ok) fehlgeschlagen.push(a.file.name);
+                    } catch {
+                        fehlgeschlagen.push(a.file.name);
+                    }
+                }
+
+                if (fehlgeschlagen.length > 0) {
+                    feedback.innerHTML =
+                        `<span style="color:orange">Ticket erstellt, aber folgende Anhänge konnten nicht hochgeladen werden: ${esc(fehlgeschlagen.join(', '))}</span>`;
+                    setTimeout(() => { window.location.href = `/ticket.html?id=${ticket.id}`; }, 2500);
+                } else {
                     feedback.innerHTML =
                         `<span style="color:green">Ticket wurde erfolgreich erstellt!</span>`;
-                    setTimeout(() => {
-                        window.location.href = '/startseite.html';
-                    }, 1500);
-                } else {
-                    let msg = 'Fehler beim Erstellen!';
-                    try {
-                        const body = await response.json();
-                        if (body.errors) msg = Object.values(body.errors).flat().join(' ');
-                        else if (typeof body === 'string') msg = body;
-                    } catch { /* kein JSON */ }
-                    feedback.innerHTML = `<span style="color:red">${msg}</span>`;
+                    setTimeout(() => { window.location.href = '/startseite.html'; }, 1500);
                 }
             } catch (e) {
-                feedback.innerHTML = `<span style="color:red">Server nicht erreichbar!</span>`;
+                feedback.innerHTML = `<span style="color:red">${esc(e.message)}</span>`;
             }
         }
 
-        // Abbrechen – zurück zur Startseite
+        // abbrechen, zurück zur übersicht
         function abbrechen() {
             window.location.href = '/startseite.html';
-        }
-
-        // Abmelden
-        function abmelden() {
-            localStorage.removeItem('meinToken');
-            window.location.href = '/index.html';
         }
     </script>
 

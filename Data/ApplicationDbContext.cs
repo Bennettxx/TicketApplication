@@ -3,9 +3,7 @@ using TicketApplication.Models;
 
 namespace TicketApplication.Data
 {
-    // Diese Klasse bildet die DB ab und ermöglicht den Zugriff auf die Tabellen
-    // Sie wird in Program.cs eingebunden und über Dependency Injection in den Controllern verfügbar gemacht
-    // Bsp.: Ein DbSet<User> Users bedeutet, dass es eine Tabelle namens "Users" gibt, die Instanzen der Klasse User enthält
+    // db-abbild, jedes DbSet = eine tabelle
     public class ApplicationDbContext : DbContext
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
@@ -24,13 +22,14 @@ namespace TicketApplication.Data
         public DbSet<TicketRead> TicketReads { get; set; }
         public DbSet<Department> Departments { get; set; }
         public DbSet<Subject> Subjects { get; set; }
+        public DbSet<AppSetting> AppSettings { get; set; }
 
-
-        // PKs festlegen - sofern es nicht "nur" die ID ist (wird autom. erkannt)
+        // keys, fks und indizes, die nicht der konvention entsprechen
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
+            // zusammengesetzter pk: ticket + laufende nummer
             modelBuilder.Entity<TicketTransaction>(entity =>
             {
                 entity.HasKey(t => new { t.TicketId, t.TransactionId });
@@ -40,9 +39,6 @@ namespace TicketApplication.Data
                       .HasForeignKey(t => t.TicketId);
             });
 
-            // TicketDialogue: eigener Auto-Increment-PK (Id), FK auf das Ticket
-            // über TicketId. Index auf TicketId, weil wir immer nach allen
-            // Nachrichten eines Tickets filtern.
             modelBuilder.Entity<TicketDialogue>(entity =>
             {
                 entity.HasKey(t => t.Id);
@@ -52,7 +48,6 @@ namespace TicketApplication.Data
                 entity.HasIndex(t => t.TicketId);
             });
 
-            // TicketTimeEntry: eigener Auto-Increment-PK (Id), FK auf das Ticket.
             modelBuilder.Entity<TicketTimeEntry>(entity =>
             {
                 entity.HasKey(t => t.Id);
@@ -62,7 +57,6 @@ namespace TicketApplication.Data
                 entity.HasIndex(t => t.TicketId);
             });
 
-            // TicketAttachments: eigener PK, FK auf das Ticket, Index auf TicketId.
             modelBuilder.Entity<TicketAttachments>(entity =>
             {
                 entity.HasKey(t => t.Id);
@@ -72,17 +66,22 @@ namespace TicketApplication.Data
                 entity.HasIndex(t => t.TicketId);
             });
 
-            // KnowledgeArticle: eigener PK.
             modelBuilder.Entity<KnowledgeArticle>(entity =>
             {
                 entity.HasKey(t => t.Id);
             });
 
-            // TicketRead: eigener PK, ein Eintrag pro (Ticket, User).
+            // ein leseeintrag pro (ticket, user)
             modelBuilder.Entity<TicketRead>(entity =>
             {
                 entity.HasKey(t => t.Id);
                 entity.HasIndex(t => new { t.TicketId, t.UserId }).IsUnique();
+            });
+
+            // einstellungen: key ist der pk
+            modelBuilder.Entity<AppSetting>(entity =>
+            {
+                entity.HasKey(t => t.Key);
             });
         }
 

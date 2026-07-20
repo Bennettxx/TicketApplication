@@ -57,6 +57,7 @@
 
     <script src="/app.js"></script>
     <script>
+        // seite aufbauen, nur staff
         (async function () {
             await seitenleisteAufbauen('wissen');
             const mich = await getMich();
@@ -69,6 +70,7 @@
             await listeLaden();
         })();
 
+        // abteilungen ins formular laden
         async function abteilungenLaden() {
             try {
                 const abt = await api('/api/metadata/departments');
@@ -78,9 +80,10 @@
                     o.value = a.name; o.textContent = a.name;
                     sel.appendChild(o);
                 });
-            } catch { /* ignore */ }
+            } catch { }
         }
 
+        // alle artikel laden
         let ARTIKEL = [];
         async function listeLaden() {
             try {
@@ -91,6 +94,7 @@
             }
         }
 
+        // liste nach suchbegriff rendern
         function artikelRender() {
             const bereich = document.getElementById('listeBereich');
             const q = document.getElementById('aSuche').value.trim().toLowerCase();
@@ -108,6 +112,7 @@
                     </div>`).join('');
         }
 
+        // formular zurücksetzen (neuer artikel)
         function formularLeeren() {
             document.getElementById('artId').value = '';
             document.getElementById('artTitel').value = '';
@@ -119,6 +124,7 @@
             document.getElementById('formFeedback').textContent = '';
         }
 
+        // artikel ins formular übernehmen
         function bearbeiten(id) {
             const a = ARTIKEL.find(x => x.id === id);
             if (!a) return;
@@ -132,6 +138,7 @@
             window.scrollTo(0, 0);
         }
 
+        // anlegen oder aktualisieren, je nachdem ob eine id gesetzt ist
         async function speichern() {
             const fb = document.getElementById('formFeedback');
             const id = document.getElementById('artId').value;
@@ -156,6 +163,7 @@
             } catch (e) { fb.textContent = e.message; }
         }
 
+        // artikel löschen
         async function loeschen(id) {
             if (!confirm('Artikel wirklich löschen?')) return;
             try {

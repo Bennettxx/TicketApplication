@@ -8,8 +8,7 @@ using TicketApplication.Models;
 
 namespace TicketApplication.Controllers
 {
-    // Wissensdatenbank / Lösungsvorschläge.
-    // Route: api/knowledge
+    // wissensdatenbank, route api/knowledge
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
@@ -25,18 +24,14 @@ namespace TicketApplication.Controllers
         private bool IsStaff =>
             User.IsInRole("Admin") || User.IsInRole("Support");
 
-        // GET /api/knowledge/suggest?q=...  -> Vorschläge anhand des Suchtexts.
-        // Einfache Stichwortsuche: Der Text wird in Wörter zerlegt; ein Artikel
-        // wird vorgeschlagen, wenn eines der Wörter in Titel/Stichwörtern/Lösung
-        // vorkommt. Treffer werden nach Anzahl passender Wörter sortiert.
-        // Jeder eingeloggte Nutzer darf das (z.B. beim Ticket-Erstellen).
+        // GET api/knowledge/suggest?q=... — stichwortsuche für lösungsvorschläge
+        // suchtext wird in wörter zerlegt, treffer nach anzahl passender wörter sortiert
         [HttpGet("suggest")]
         public async Task<ActionResult<IEnumerable<KnowledgeSuggestionDto>>> Suggest([FromQuery] string? q)
         {
             if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 3)
                 return Ok(Array.Empty<KnowledgeSuggestionDto>());
 
-            // Suchwörter (ab 3 Zeichen) extrahieren.
             var woerter = q.ToLowerInvariant()
                 .Split(new[] { ' ', ',', ';', '.', '!', '?', '\n', '\r', '\t', '-', '/' },
                        StringSplitOptions.RemoveEmptyEntries)
@@ -47,8 +42,7 @@ namespace TicketApplication.Controllers
             if (woerter.Count == 0)
                 woerter.Add(q.Trim().ToLowerInvariant());
 
-            // Die Wissensdatenbank ist klein -> veröffentlichte Artikel laden und
-            // im Speicher bewerten (robuster als dynamische OR-Abfragen).
+            // kleiner datenbestand, bewertung im speicher
             var artikel = await _context.KnowledgeArticles
                 .Where(a => a.IsPublished)
                 .ToListAsync();
@@ -75,7 +69,7 @@ namespace TicketApplication.Controllers
             return Ok(treffer);
         }
 
-        // GET /api/knowledge  -> Alle Artikel (Verwaltung, nur Staff).
+        // GET api/knowledge — alle artikel für die verwaltung, nur staff
         [HttpGet]
         [Authorize(Roles = "Admin,Support")]
         public async Task<ActionResult<IEnumerable<KnowledgeArticleDto>>> GetAll()
@@ -99,13 +93,12 @@ namespace TicketApplication.Controllers
             return Ok(list);
         }
 
-        // GET /api/knowledge/{id}  -> Einzelner Artikel.
+        // GET api/knowledge/{id} — einzelner artikel, entwürfe nur für staff
         [HttpGet("{id}")]
         public async Task<ActionResult<KnowledgeArticleDto>> Get(int id)
         {
             var a = await _context.KnowledgeArticles.FindAsync(id);
             if (a == null) return NotFound();
-            // Unveröffentlichte Artikel nur für Staff sichtbar.
             if (!a.IsPublished && !IsStaff) return NotFound();
 
             string? depName = a.DepartmentId == null ? null : await _context.Departments
@@ -125,7 +118,7 @@ namespace TicketApplication.Controllers
             });
         }
 
-        // POST /api/knowledge  -> Artikel anlegen (Staff).
+        // POST api/knowledge — artikel anlegen, nur staff
         [HttpPost]
         [Authorize(Roles = "Admin,Support")]
         public async Task<ActionResult<KnowledgeArticleDto>> Create(CreateKnowledgeArticleDto dto)
@@ -161,7 +154,7 @@ namespace TicketApplication.Controllers
             });
         }
 
-        // PUT /api/knowledge/{id}  -> Artikel ändern (Staff, Felder optional).
+        // PUT api/knowledge/{id} — teilupdate, nur staff
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin,Support")]
         public async Task<IActionResult> Update(int id, UpdateKnowledgeArticleDto dto)
@@ -180,7 +173,7 @@ namespace TicketApplication.Controllers
             return NoContent();
         }
 
-        // DELETE /api/knowledge/{id}  -> Artikel löschen (Staff).
+        // DELETE api/knowledge/{id} — artikel löschen, nur staff
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin,Support")]
         public async Task<IActionResult> Delete(int id)
@@ -192,6 +185,7 @@ namespace TicketApplication.Controllers
             return NoContent();
         }
 
+        // abteilungsname -> id, null wenn leer/unbekannt
         private async Task<int?> ResolveDepartmentId(string? name)
         {
             if (string.IsNullOrWhiteSpace(name)) return null;

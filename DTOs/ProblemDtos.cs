@@ -3,7 +3,7 @@ using TicketApplication.Data;
 
 namespace TicketApplication.DTOs
 {
-    // Eingangs-DTO für eine neue Problemmeldung (anonym oder eingeloggt).
+    // eingang für eine problemmeldung, anonym oder eingeloggt
     public class CreateProblemDto
     {
         [Required(ErrorMessage = "Titel ist erforderlich.")]
@@ -19,13 +19,12 @@ namespace TicketApplication.DTOs
         [EnumDataType(typeof(TicketPriority), ErrorMessage = "Ungültige Priorität.")]
         public TicketPriority Priority { get; set; } = TicketPriority.Low;
 
-        // Kontakt-E-Mail ist PFLICHT (auch eingeloggt – dort vorbefüllt, aber änderbar).
         [Required(ErrorMessage = "Kontakt-E-Mail ist erforderlich.")]
         [EmailAddress(ErrorMessage = "Keine gültige E-Mail-Adresse.")]
         public string ContactEmail { get; set; } = string.Empty;
     }
 
-    // Eingangs-DTO für die Statusänderung (nur Admin).
+    // eingang für die statusänderung, nur admin
     public class UpdateProblemStatusDto
     {
         [Required]
@@ -33,7 +32,7 @@ namespace TicketApplication.DTOs
         public TicketStatus Status { get; set; }
     }
 
-    // Ausgangs-DTO für eine Problemmeldung.
+    // ausgang für eine problemmeldung
     public class ProblemResponseDto
     {
         public int Id { get; set; }

@@ -1,6 +1,6 @@
 namespace TicketApplication.DTOs
 {
-    // Ausgangs-DTO für die Metadaten eines Anhangs (ohne den eigentlichen Inhalt).
+    // ausgang für anhang-metadaten, ohne dateiinhalt
     public class AttachmentResponseDto
     {
         public int Id { get; set; }

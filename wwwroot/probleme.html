@@ -14,7 +14,7 @@
         <p style="color:#555">Eingegangene Problemmeldungen (auch anonyme). Nur Admins sehen und bearbeiten sie.</p>
         <p id="feedback" class="mini"></p>
 
-        <!-- Such-/Filterleiste -->
+        <!-- such- und filterleiste -->
         <div class="karte" style="margin-bottom:16px;">
             <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
                 <div style="flex:2; min-width:200px;">
@@ -49,6 +49,7 @@
     <script>
         let filterTimer = null;
 
+        // seite aufbauen, nur admin
         (async function () {
             await seitenleisteAufbauen('probleme');
             const mich = await getMich();
@@ -59,8 +60,10 @@
             await laden();
         })();
 
+        // suche mit debounce
         function filterDebounce() { clearTimeout(filterTimer); filterTimer = setTimeout(laden, 350); }
 
+        // meldungen mit filtern laden und rendern
         async function laden() {
             const p = new URLSearchParams();
             const q = document.getElementById('fSuche').value.trim();
@@ -78,6 +81,7 @@
                     <table>
                         <thead><tr>
                             <th>Nr</th><th>Titel</th><th>Priorität</th><th>Kontakt</th><th>Eingegangen</th><th>Status</th>
+                            <th style="text-align:right;">Löschen</th>
                         </tr></thead>
                         <tbody>${probleme.map(x => `
                             <tr>
@@ -92,7 +96,9 @@
                                         <option value="1" ${x.statusCode===1?'selected':''}>In Bearbeitung</option>
                                         <option value="2" ${x.statusCode===2?'selected':''}>Geschlossen</option>
                                     </select>
-                                    <button class="btn-rot" style="padding:4px 8px;" onclick="loeschen(${x.id})">✕</button>
+                                </td>
+                                <td style="text-align:right; vertical-align:middle;">
+                                    <button class="btn-rot" style="padding:4px 10px;" onclick="loeschen(${x.id})">✕</button>
                                 </td>
                             </tr>`).join('')}
                         </tbody>
@@ -102,6 +108,7 @@
             }
         }
 
+        // status einer meldung setzen
         async function statusAendern(id, status) {
             try {
                 await api(`/api/problem/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: parseInt(status) }) });
@@ -109,6 +116,7 @@
             } catch (e) { document.getElementById('feedback').textContent = e.message; }
         }
 
+        // meldung löschen
         async function loeschen(id) {
             if (!confirm('Meldung wirklich löschen?')) return;
             try {

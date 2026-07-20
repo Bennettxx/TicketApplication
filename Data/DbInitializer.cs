@@ -1,24 +1,16 @@
-﻿using TicketApplication.Models;
-using Microsoft.EntityFrameworkCore;
+using TicketApplication.Models;
 
 namespace TicketApplication.Data
 {
-    // Diese Klasse wird in Program.cs aufgerufen, um die DB zu initialisieren
-    // Schritt 1: Prüfen ob DB da ist und Tabellen laut Schema anlegen
-    //            Das Schema ergibt sich aus den DbSet-Variablen in ApplicationDbContext.cs
-    // Schritt 2: Prüfen ob bestimmte Tabellen leer sind und Default-Daten
-    //            anlegen (z.B. Standard-Admin-User).
+    // legt db + tabellen an und spielt startdaten ein
+    // achtung: EnsureCreated migriert nicht — bei model-änderungen lokale db löschen
     public class DbInitializer
     {
-        public static void Initialize(ApplicationDbContext context)
+        public static void Initialize(ApplicationDbContext context, bool isDevelopment = false)
         {
-            // Legt die DB inkl. aller Tabellen an, falls sie noch nicht existiert.
-            // Bei bestehenden DBs passiert nichts — Schema-Änderungen werden NICHT automatisch eingespielt.
-            // Wenn das Model erweitert wird, muss die lokale DB einmal gelöscht werden.
             context.Database.EnsureCreated();
 
-            // ZUERST Abteilungen anlegen, damit die Benutzer ihnen direkt
-            // zugeordnet werden können.
+            // abteilungen zuerst, user brauchen sie
             if (!context.Departments.Any())
             {
                 string[] departmentNames = { "IT Support", "Einkauf", "Verkauf" };
@@ -29,55 +21,72 @@ namespace TicketApplication.Data
                 context.SaveChanges();
             }
 
-            // Standard-Benutzer für die lokale Entwicklung. Alle mit dem
-            // Passwort "Password". In Produktion natürlich ändern!
-            //   admin@user.com    -> Admin   (alle Rechte, Statistik)
-            //   support@user.com  -> Support (Tickets bearbeiten, Kanban)
-            //   kunde@user.com    -> User    (eigene Tickets erstellen)
-            if (!context.Users.Any())
-            {
-                // Abteilungs-Id für den Kunden auflösen.
-                // Admin/Support bekommen KEINE Abteilung (DepartmentId = null).
-                int? einkaufDep = context.Departments.Where(d => d.Name == "Einkauf").Select(d => (int?)d.Id).FirstOrDefault();
+            // dev-testuser, passwort jeweils "Password"
+            //if (isDevelopment && !context.Users.Any())
+            //{
+            //    int? einkaufDep = context.Departments.Where(d => d.Name == "Einkauf").Select(d => (int?)d.Id).FirstOrDefault();
 
-                context.Users.AddRange(
-                    new User
-                    {
-                        FirstName = "A_Vorname",
-                        SecondName = "A_Nachname",
-                        Email = "admin@user.com",
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
-                        Role = UserRole.Admin,
-                        DepartmentId = null,
-                        IsActivated = true,
-                        IsActive = true
-                    },
-                    new User
-                    {
-                        FirstName = "S_Vorname",
-                        SecondName = "S_Nachname",
-                        Email = "support@user.com",
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
-                        Role = UserRole.Support,
-                        DepartmentId = null,
-                        IsActivated = true,
-                        IsActive = true
-                    },
-                    new User
-                    {
-                        FirstName = "U_Vorname",
-                        SecondName = "U_Nachname",
-                        Email = "user@user.com",
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
-                        Role = UserRole.User,
-                        DepartmentId = einkaufDep,
-                        IsActivated = true,
-                        IsActive = true
-                    });
+            //    context.Users.AddRange(
+            //        new User
+            //        {
+            //            FirstName = "A_Vorname",
+            //            SecondName = "A_Nachname",
+            //            Email = "admin@user.com",
+            //            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
+            //            Role = UserRole.Admin,
+            //            DepartmentId = null,
+            //            IsActivated = true,
+            //            IsActive = true,
+            //            EmailConfirmed = true
+            //        },
+            //        new User
+            //        {
+            //            FirstName = "S_Vorname",
+            //            SecondName = "S_Nachname",
+            //            Email = "support@user.com",
+            //            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
+            //            Role = UserRole.Support,
+            //            DepartmentId = null,
+            //            IsActivated = true,
+            //            IsActive = true,
+            //            EmailConfirmed = true
+            //        },
+            //        new User
+            //        {
+            //            FirstName = "U_Vorname",
+            //            SecondName = "U_Nachname",
+            //            Email = "user@user.com",
+            //            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
+            //            Role = UserRole.User,
+            //            DepartmentId = einkaufDep,
+            //            IsActivated = true,
+            //            IsActive = true,
+            //            EmailConfirmed = true
+            //        });
+            //    context.SaveChanges();
+            //}
+
+            // default-admin (admin@ticket.local / admin) falls kein admin existiert;
+            // muss beim ersten login das passwort ändern
+            if (!context.Users.Any(u => u.Role == UserRole.Admin && u.IsActive))
+            {
+                context.Users.Add(new User
+                {
+                    FirstName = "Standard",
+                    SecondName = "Admin",
+                    Email = Controllers.SetupController.DefaultAdminEmail,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(Controllers.SetupController.DefaultAdminPassword),
+                    Role = UserRole.Admin,
+                    DepartmentId = null,
+                    IsActivated = true,
+                    IsActive = true,
+                    EmailConfirmed = true,
+                    MustChangePassword = true
+                });
                 context.SaveChanges();
             }
 
-            // Beispiel-Wissensartikel für die Lösungsvorschläge.
+            // beispiel-wissensartikel
             if (!context.KnowledgeArticles.Any())
             {
                 context.KnowledgeArticles.AddRange(

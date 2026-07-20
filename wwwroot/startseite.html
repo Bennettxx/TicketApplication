@@ -7,7 +7,6 @@
 </head>
 <body>
 
-    <!-- Seitenleiste wird per app.js (rollenabhängig) befüllt -->
     <div class="sidebar" id="sidebar"></div>
 
     <div class="main">
@@ -16,7 +15,7 @@
         <h1 id="ueberschrift">Meine Tickets</h1>
         <p id="hinweis" style="color:#555"></p>
 
-        <!-- Such- & Filterleiste -->
+        <!-- such- und filterleiste -->
         <div class="karte" style="margin-bottom:16px;">
             <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
                 <div style="flex:2; min-width:180px;">
@@ -67,27 +66,25 @@
         let IST_STAFF = false;
         let filterTimer = null;
 
-        // Seite aufbauen
+        // seite aufbauen; staff sieht alle tickets, user nur eigene
         (async function () {
             await seitenleisteAufbauen('tickets');
             const mich = await getMich();
             IST_STAFF = istStaff(mich);
 
-            // Staff sieht ALLE Tickets, ein Kunde nur die eigenen.
             document.getElementById('ueberschrift').innerText =
                 IST_STAFF ? 'Alle offenen Tickets' : 'Meine offenen Tickets';
             document.getElementById('hinweis').innerText = IST_STAFF
                 ? 'Offene Tickets. Geschlossene findest du unter „Verlauf".'
                 : 'Deine offenen Tickets. Geschlossene findest du unter „Verlauf".';
 
-            // Zuweisungsfilter nur für Staff einblenden.
             if (IST_STAFF) document.getElementById('fZuweisungBox').style.display = 'block';
 
             await abteilungenFuerFilter();
             await ladeMitFilter();
         })();
 
-        // Abteilungen in den Filter laden.
+        // abteilungen ins filter-dropdown laden
         async function abteilungenFuerFilter() {
             try {
                 const abt = await api('/api/metadata/departments');
@@ -97,20 +94,19 @@
                     o.value = a.id; o.textContent = a.name;
                     sel.appendChild(o);
                 });
-            } catch { /* ignore */ }
+            } catch { }
         }
 
-        // Suche mit kleiner Verzögerung (debounce), damit nicht bei jedem
-        // Tastendruck eine Anfrage rausgeht.
+        // suche mit debounce, nicht bei jedem tastendruck laden
         function filterDebounce() {
             clearTimeout(filterTimer);
             filterTimer = setTimeout(ladeMitFilter, 350);
         }
 
-        // Baut die Query-Parameter aus der Filterleiste und lädt neu.
+        // query-parameter aus der filterleiste bauen und neu laden
         async function ladeMitFilter() {
             const p = new URLSearchParams();
-            // Startseite zeigt ausschließlich offene (nicht geschlossene) Tickets.
+            // startseite zeigt nur nicht-geschlossene tickets
             p.set('activeOnly', 'true');
             const q = document.getElementById('fSuche').value.trim();
             const prio = document.getElementById('fPrio').value;
@@ -127,6 +123,7 @@
             await ticketsLaden(IST_STAFF, p.toString());
         }
 
+        // tickets laden und als tabelle rendern
         async function ticketsLaden(staff, queryString) {
             const bereich = document.getElementById('ticketBereich');
             try {
@@ -163,6 +160,7 @@
             }
         }
 
+        // zur detailseite
         function oeffne(id) {
             window.location.href = `/ticket.html?id=${id}`;
         }

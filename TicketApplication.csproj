@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <!-- release-build ohne konsolenfenster; debug behält die konsole -->
+    <OutputType Condition="'$(Configuration)' == 'Release'">WinExe</OutputType>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>230203b4-26e6-4ebd-953c-81e1c96470fe</UserSecretsId>
@@ -11,9 +13,11 @@
 
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
+    <PackageReference Include="MailKit" Version="4.17.0" />
+    <PackageReference Include="Microsoft.OpenApi" Version="3.8.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.9" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.6" />
     <PackageReference Include="Microsoft.AspNetCore.Authorization" Version="10.0.6" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.6" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.6">
       <PrivateAssets>all</PrivateAssets>
@@ -25,11 +29,18 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
-    <PackageReference Include="Scalar.AspNetCore" Version="2.14.1" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="wwwroot\index.html" />
+  </ItemGroup>
+
+  <!-- testprojekt liegt im unterordner und darf nicht ins hauptprojekt kompiliert werden -->
+  <ItemGroup>
+    <Compile Remove="TicketApplication.Tests\**" />
+    <Content Remove="TicketApplication.Tests\**" />
+    <None Remove="TicketApplication.Tests\**" />
+    <EmbeddedResource Remove="TicketApplication.Tests\**" />
   </ItemGroup>
 
 </Project>

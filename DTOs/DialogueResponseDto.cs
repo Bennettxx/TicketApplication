@@ -1,7 +1,6 @@
 namespace TicketApplication.DTOs
 {
-    // Ausgangs-DTO für eine Chat-Nachricht. Enthält bewusst nur Daten, die der
-    // Empfänger sehen darf – z.B. die E-Mail des Autors, aber nichts Sensibles.
+    // ausgang für eine chat-nachricht
     public class DialogueResponseDto
     {
         public int Id { get; set; }

@@ -9,6 +9,7 @@
         td select { width: auto; padding: 6px; }
         .akt-aus { color: #dc3545; font-weight: bold; }
         .akt-an { color: #28a745; font-weight: bold; }
+        .akt-wartet { color: #e0a800; font-weight: bold; }
         .btn-mini { padding: 5px 10px; font-size: 13px; }
     </style>
 </head>
@@ -59,6 +60,8 @@
     <script src="/app.js"></script>
     <script>
         let MICH_CACHE = null;
+
+        // seite aufbauen, nur admin
         (async function () {
             await seitenleisteAufbauen('benutzer');
             MICH_CACHE = await getMich();
@@ -72,12 +75,14 @@
             await userLaden();
         })();
 
-        // Abteilungen für die Auswahl je Benutzer.
+        // abteilungen für die auswahl je benutzer
         let ABTEILUNGEN = [];
         async function abteilungenLaden() {
             try { ABTEILUNGEN = await api('/api/metadata/departments'); }
             catch { ABTEILUNGEN = []; }
         }
+
+        // options-html für das abteilungs-dropdown
         function abteilungOptions(selectedName) {
             const leer = `<option value="" ${!selectedName ? 'selected' : ''}>—</option>`;
             return leer + ABTEILUNGEN.map(a =>
@@ -85,13 +90,14 @@
             ).join('');
         }
 
+        // feedback-zeile setzen
         function setFeedback(text, ok) {
             const fb = document.getElementById('feedback');
             fb.textContent = text;
             fb.className = ok ? 'feedback-gruen' : 'feedback-rot';
         }
 
-        // ---- Offene Registrierungen ----
+        // offene registrierungen laden
         async function pendingLaden() {
             const bereich = document.getElementById('pendingBereich');
             try {
@@ -106,7 +112,8 @@
                         <tbody>${pending.map(u => `
                             <tr>
                                 <td>${esc(u.firstName)} ${esc(u.secondName)}</td>
-                                <td>${esc(u.email)}</td>
+                                <td>${esc(u.email)}
+                                    ${u.emailConfirmed ? '' : '<br><span class="mini" style="color:#e0a800">E-Mail noch nicht bestätigt</span>'}</td>
                                 <td>${esc(u.departmentName || '—')}</td>
                                 <td>
                                     <button class="btn-gruen btn-mini" onclick="freischalten(${u.id})">Freischalten</button>
@@ -120,6 +127,7 @@
             }
         }
 
+        // registrierung freischalten
         async function freischalten(id) {
             try {
                 await api(`/api/user/${id}/approve`, { method: 'POST' });
@@ -128,6 +136,7 @@
             } catch (e) { setFeedback(e.message, false); }
         }
 
+        // registrierung ablehnen (soft-delete)
         async function ablehnen(id) {
             if (!confirm('Diese Registrierung wirklich ablehnen?')) return;
             try {
@@ -137,7 +146,7 @@
             } catch (e) { setFeedback(e.message, false); }
         }
 
-        // ---- Alle Benutzer ----
+        // alle user laden
         let ALLE_USER = [];
         async function userLaden() {
             try {
@@ -148,6 +157,14 @@
             }
         }
 
+        // status-badge je user: gesperrt / wartet auf freischaltung / aktiv
+        function statusBadge(u) {
+            if (!u.isActive) return '<span class="akt-aus">gesperrt</span>';
+            if (!u.isActivated) return '<span class="akt-wartet">nicht freigeschaltet</span>';
+            return '<span class="akt-an">aktiv</span>';
+        }
+
+        // tabelle nach filtern neu zeichnen
         function userRender() {
             const bereich = document.getElementById('userBereich');
             const q = document.getElementById('uSuche').value.trim().toLowerCase();
@@ -159,8 +176,8 @@
                 const name = `${u.firstName} ${u.secondName} ${u.email}`.toLowerCase();
                 if (q && !name.includes(q)) return false;
                 if (rolle && u.role !== rolle) return false;
-                if (status === '1' && !u.isActivated) return false;
-                if (status === '0' && u.isActivated) return false;
+                if (status === '1' && !u.isActive) return false;
+                if (status === '0' && u.isActive) return false;
                 return true;
             });
 
@@ -185,22 +202,20 @@
                                 <td>
                                     <select id="abt-${u.id}">${abteilungOptions(u.departmentName)}</select>
                                 </td>
-                                <td><span class="${u.isActivated ? 'akt-an' : 'akt-aus'}">${u.isActivated ? 'aktiv' : 'gesperrt'}</span></td>
+                                <td>${statusBadge(u)}</td>
                                 <td>
                                     <button class="btn-grau btn-mini" onclick="userSpeichern(${u.id})">Speichern</button>
                                     ${u.id === mich.id ? '' :
-                                        (u.isActivated
+                                        (u.isActive
                                             ? `<button class="btn-rot btn-mini" onclick="sperren(${u.id})">Sperren</button>`
                                             : `<button class="btn-gruen btn-mini" onclick="entsperren(${u.id})">Entsperren</button>`)}
                                 </td>
                             </tr>`).join('')}
                         </tbody>
                     </table>`;
-            } catch (e) {
-                bereich.innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
-            }
         }
 
+        // rolle/abteilung einer zeile speichern
         async function userSpeichern(id) {
             const rolle = parseInt(document.getElementById(`rolle-${id}`).value);
             const abteilung = document.getElementById(`abt-${id}`).value;
@@ -214,17 +229,19 @@
             } catch (e) { setFeedback(e.message, false); }
         }
 
-        // "Sperren" = Konto deaktivieren (IsActivated=false). Login wird blockiert.
+        // konto sperren (soft-delete), login wird blockiert
         async function sperren(id) {
             try {
-                await api(`/api/user/${id}`, { method: 'PUT', body: JSON.stringify({ isActivated: false }) });
+                await api(`/api/user/${id}`, { method: 'PUT', body: JSON.stringify({ isActive: false }) });
                 setFeedback('Benutzer gesperrt.', true);
                 await userLaden();
             } catch (e) { setFeedback(e.message, false); }
         }
+
+        // konto entsperren
         async function entsperren(id) {
             try {
-                await api(`/api/user/${id}`, { method: 'PUT', body: JSON.stringify({ isActivated: true }) });
+                await api(`/api/user/${id}`, { method: 'PUT', body: JSON.stringify({ isActive: true }) });
                 setFeedback('Benutzer entsperrt.', true);
                 await userLaden();
             } catch (e) { setFeedback(e.message, false); }

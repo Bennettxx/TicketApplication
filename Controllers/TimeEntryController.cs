@@ -8,10 +8,7 @@ using TicketApplication.Models;
 
 namespace TicketApplication.Controllers
 {
-    // Zeiterfassung eines Tickets (manuelle Einträge).
-    // Route: api/ticket/{ticketId}/time
-    // Nur Admin/Support dürfen Zeit erfassen und einsehen – Zeiterfassung ist
-    // eine interne Funktion der Ticketbearbeitung.
+    // zeiterfassung, route api/ticket/{ticketId}/time, nur admin/support
     [Route("api/ticket/{ticketId}/time")]
     [ApiController]
     [Authorize(Roles = "Admin,Support")]
@@ -27,7 +24,7 @@ namespace TicketApplication.Controllers
         private int CurrentUserId =>
             int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        // GET -> Alle Zeiteinträge eines Tickets (neueste zuerst).
+        // GET — alle zeiteinträge eines tickets, neueste zuerst
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TimeEntryResponseDto>>> Get(int ticketId)
         {
@@ -54,9 +51,7 @@ namespace TicketApplication.Controllers
             return Ok(entries);
         }
 
-        // POST -> Neuen Zeiteintrag anlegen.
-        // UserId kommt aus dem JWT (wer erfasst), nicht vom Client.
-        // Minuten/Datum werden bereits im DTO geprüft (Range, NotInFuture).
+        // POST — zeiteintrag anlegen, userid aus jwt, validierung im dto
         [HttpPost]
         public async Task<ActionResult<TimeEntryResponseDto>> Post(int ticketId, CreateTimeEntryDto dto)
         {
@@ -96,8 +91,7 @@ namespace TicketApplication.Controllers
             });
         }
 
-        // DELETE -> Einen Zeiteintrag löschen.
-        // Support darf nur eigene Einträge löschen, Admin darf alle löschen.
+        // DELETE — eintrag löschen; support nur eigene, admin alle
         [HttpDelete("{entryId}")]
         public async Task<IActionResult> Delete(int ticketId, int entryId)
         {

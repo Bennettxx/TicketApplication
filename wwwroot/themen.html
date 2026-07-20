@@ -2,19 +2,35 @@
 <html lang="de">
 <head>
     <meta charset="utf-8">
-    <title>Themen verwalten</title>
+    <title>Abteilungen und Themen</title>
     <link rel="stylesheet" href="/style.css">
+    <style>
+        h2 { color: #2c3e50; margin: 26px 0 6px; }
+        .btn-mini { padding: 5px 12px; font-size: 13px; }
+        .neu-zeile { display: flex; gap: 10px; margin-top: 14px; align-items: center; }
+        .neu-zeile input { flex: 1; max-width: 340px; }
+        td .mini { color: #888; }
+    </style>
 </head>
 <body>
     <div class="sidebar" id="sidebar"></div>
 
     <div class="main">
         <span class="benutzer" id="benutzername">...</span>
-        <h1>Themen (Subjects)</h1>
-        <p style="color:#555">Beim Ticket-Erstellen entstehen neue Themen unverifiziert. Verifizierte Themen werden dort als Auswahl angeboten.</p>
+        <h1>Abteilungen und Themen</h1>
         <p id="feedback" class="mini"></p>
 
-        <!-- Such-/Filterleiste -->
+        <!-- abteilungen: stammdaten, nur admin -->
+        <div id="abteilungBlock" style="display:none;">
+            <h2>Abteilungen</h2>
+            <p style="color:#555">Stammdaten für Benutzer, Tickets und Themen. Löschen ist nur möglich, wenn nichts mehr zugeordnet ist.</p>
+            <div id="abteilungBereich" class="karte">Lädt...</div>
+        </div>
+
+        <!-- themen: verifizierung, staff -->
+        <h2>Themen</h2>
+        <p style="color:#555">Beim Ticket-Erstellen entstehen neue Themen unverifiziert. Verifizierte Themen werden dort als Auswahl angeboten.</p>
+
         <div class="karte" style="margin-bottom:16px;">
             <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
                 <div style="flex:2; min-width:200px;">
@@ -42,33 +58,123 @@
     <script src="/app.js"></script>
     <script>
         let SUBJECTS = [];
-        let DEPTMAP = {};   // id -> name
-        let MICH = null;
+        let DEPTMAP = {}; // abteilungs-id -> name
+        let IST_ADMIN = false;
 
+        // seite aufbauen, nur staff; abteilungsblock nur für admin
         (async function () {
             await seitenleisteAufbauen('themen');
-            MICH = await getMich();
-            if (!istStaff(MICH)) {
+            const mich = await getMich();
+            if (!istStaff(mich)) {
                 document.querySelector('.main').innerHTML = '<p class="feedback-rot">Kein Zugriff. Nur Admin/Support.</p>';
                 return;
             }
-            await abteilungenLaden();
+            IST_ADMIN = mich.role === 'Admin';
+            if (IST_ADMIN) {
+                document.getElementById('abteilungBlock').style.display = 'block';
+                await abteilungenVerwaltungLaden();
+            }
+            await abteilungenFilterLaden();
             await laden();
         })();
 
-        async function abteilungenLaden() {
+        function setFeedback(text, ok) {
+            const fb = document.getElementById('feedback');
+            fb.textContent = text;
+            fb.className = ok ? 'feedback-gruen' : 'feedback-rot';
+        }
+
+        // ---- abteilungsverwaltung (admin) ----
+
+        // liste mit nutzungszählern laden und rendern
+        async function abteilungenVerwaltungLaden() {
+            const bereich = document.getElementById('abteilungBereich');
+            try {
+                const abt = await api('/api/department');
+                bereich.innerHTML = `
+                    <table>
+                        <thead><tr>
+                            <th>Abteilung</th><th>Benutzer</th><th>Tickets</th><th>Themen</th>
+                            <th style="text-align:right;">Aktion</th>
+                        </tr></thead>
+                        <tbody>${abt.map(a => `
+                            <tr>
+                                <td><b>${esc(a.name)}</b></td>
+                                <td>${a.userCount}</td>
+                                <td>${a.ticketCount}</td>
+                                <td>${a.subjectCount}</td>
+                                <td style="text-align:right;">
+                                    <button class="btn-grau btn-mini" onclick="abteilungUmbenennen(${a.id}, '${esc(a.name)}')">Umbenennen</button>
+                                    <button class="btn-rot btn-mini" onclick="abteilungLoeschen(${a.id}, '${esc(a.name)}')">Löschen</button>
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                    <div class="neu-zeile">
+                        <input type="text" id="neueAbteilung" maxlength="100" placeholder="Neue Abteilung...">
+                        <button class="btn-gruen" onclick="abteilungAnlegen()">Anlegen</button>
+                    </div>`;
+            } catch (e) {
+                bereich.innerHTML = `<p class="feedback-rot">${esc(e.message)}</p>`;
+            }
+        }
+
+        // neue abteilung anlegen
+        async function abteilungAnlegen() {
+            const name = document.getElementById('neueAbteilung').value.trim();
+            if (name.length < 2) { setFeedback('Name muss mindestens 2 Zeichen haben.', false); return; }
+            try {
+                await api('/api/department', { method: 'POST', body: JSON.stringify({ name: name }) });
+                setFeedback(`Abteilung „${name}" angelegt.`, true);
+                await abteilungenVerwaltungLaden();
+                await abteilungenFilterLaden();
+            } catch (e) { setFeedback(e.message, false); }
+        }
+
+        // abteilung umbenennen (prompt mit vorbelegtem namen)
+        async function abteilungUmbenennen(id, alterName) {
+            const neu = prompt('Neuer Name für die Abteilung:', alterName);
+            if (neu === null) return;
+            if (neu.trim().length < 2) { setFeedback('Name muss mindestens 2 Zeichen haben.', false); return; }
+            try {
+                await api(`/api/department/${id}`, { method: 'PUT', body: JSON.stringify({ name: neu.trim() }) });
+                setFeedback('Abteilung umbenannt.', true);
+                await abteilungenVerwaltungLaden();
+                await abteilungenFilterLaden();
+                await laden();
+            } catch (e) { setFeedback(e.message, false); }
+        }
+
+        // abteilung löschen, backend schützt bei zuordnungen
+        async function abteilungLoeschen(id, name) {
+            if (!confirm(`Abteilung „${name}" wirklich löschen?`)) return;
+            try {
+                await api(`/api/department/${id}`, { method: 'DELETE' });
+                setFeedback(`Abteilung „${name}" gelöscht.`, true);
+                await abteilungenVerwaltungLaden();
+                await abteilungenFilterLaden();
+            } catch (e) { setFeedback(e.message, false); }
+        }
+
+        // ---- themen (staff) ----
+
+        // abteilungen ins filter-dropdown laden
+        async function abteilungenFilterLaden() {
             try {
                 const abt = await api('/api/metadata/departments');
+                DEPTMAP = {};
                 const sel = document.getElementById('fAbteilung');
+                sel.innerHTML = '<option value="">Alle</option>';
                 abt.forEach(a => {
                     DEPTMAP[a.id] = a.name;
                     const o = document.createElement('option');
                     o.value = a.id; o.textContent = a.name;
                     sel.appendChild(o);
                 });
-            } catch { /* ignore */ }
+            } catch { }
         }
 
+        // themen laden
         async function laden() {
             try {
                 SUBJECTS = await api('/api/subject');
@@ -78,6 +184,7 @@
             }
         }
 
+        // themen-tabelle nach filtern rendern
         function rendern() {
             const q = document.getElementById('fSuche').value.trim().toLowerCase();
             const status = document.getElementById('fStatus').value;
@@ -93,10 +200,9 @@
 
             if (!liste.length) { document.getElementById('bereich').innerHTML = '<p>Keine Themen gefunden.</p>'; return; }
 
-            const istAdmin = MICH.role === 'Admin';
             document.getElementById('bereich').innerHTML = `
                 <table>
-                    <thead><tr><th>Thema</th><th>Abteilung</th><th>Status</th><th>Aktion</th></tr></thead>
+                    <thead><tr><th>Thema</th><th>Abteilung</th><th>Status</th><th style="text-align:right;">Aktion</th></tr></thead>
                     <tbody>${liste.map(s => `
                         <tr>
                             <td>${esc(s.title)}</td>
@@ -104,30 +210,32 @@
                             <td>${s.isVerified
                                 ? '<span class="badge" style="background:#28a745">verifiziert</span>'
                                 : '<span class="badge" style="background:#6c757d">offen</span>'}</td>
-                            <td>
+                            <td style="text-align:right;">
                                 ${s.isVerified
-                                    ? `<button class="btn-grau" onclick="setVerify(${s.id}, false)">Zurücknehmen</button>`
-                                    : `<button class="btn-gruen" onclick="setVerify(${s.id}, true)">Verifizieren</button>`}
-                                ${istAdmin ? `<button class="btn-rot" onclick="loeschen(${s.id})">Löschen</button>` : ''}
+                                    ? `<button class="btn-grau btn-mini" onclick="setVerify(${s.id}, false)">Zurücknehmen</button>`
+                                    : `<button class="btn-gruen btn-mini" onclick="setVerify(${s.id}, true)">Verifizieren</button>`}
+                                ${IST_ADMIN ? `<button class="btn-rot btn-mini" onclick="loeschen(${s.id})">Löschen</button>` : ''}
                             </td>
                         </tr>`).join('')}
                     </tbody>
                 </table>`;
         }
 
+        // thema verifizieren oder zurücknehmen
         async function setVerify(id, verify) {
             try {
                 await api(`/api/subject/${id}/${verify ? 'verify' : 'unverify'}`, { method: 'PATCH' });
                 await laden();
-            } catch (e) { document.getElementById('feedback').textContent = e.message; }
+            } catch (e) { setFeedback(e.message, false); }
         }
 
+        // thema löschen, nur admin
         async function loeschen(id) {
             if (!confirm('Thema wirklich löschen?')) return;
             try {
                 await api(`/api/subject/${id}`, { method: 'DELETE' });
                 await laden();
-            } catch (e) { document.getElementById('feedback').textContent = e.message; }
+            } catch (e) { setFeedback(e.message, false); }
         }
     </script>
 </body>

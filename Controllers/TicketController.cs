@@ -5,6 +5,7 @@ using System.Security.Claims;
 using TicketApplication.Data;
 using TicketApplication.DTOs;
 using TicketApplication.Models;
+using TicketApplication.Services;
 
 namespace TicketApplication.Controllers
 {
@@ -14,46 +15,44 @@ namespace TicketApplication.Controllers
     public class TicketController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly MailService _mail;
+        private readonly MailQueue _mailQueue;
+        private readonly LogService _log;
 
-        public TicketController(ApplicationDbContext context)
+        public TicketController(ApplicationDbContext context, MailService mail, MailQueue mailQueue, LogService log)
         {
             _context = context;
+            _mail = mail;
+            _mailQueue = mailQueue;
+            _log = log;
         }
 
-        // -----------------------------------------------------------------
-        // Hilfsmethoden für die Rolle/Identität aus dem JWT.
-        // Niemals vom Client glauben – immer aus dem Token lesen.
-        // -----------------------------------------------------------------
+        // user-id aus dem jwt, nie vom client
         private int CurrentUserId =>
             int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
+        // admin oder support
         private bool IsStaff =>
             User.IsInRole("Admin") || User.IsInRole("Support");
 
-        // -----------------------------------------------------------------
-        // POST /api/ticket  -> Neues Ticket anlegen
-        // NUR die Rolle "User" darf Tickets erstellen (Admin/Support nicht).
-        // CreatedByUserId kommt aus dem JWT, NICHT vom Client.
-        // -----------------------------------------------------------------
+        // POST api/ticket — neues ticket, nur rolle user
         [HttpPost]
         [Authorize(Roles = "User")]
         public async Task<ActionResult<TicketResponseDto>> Create(CreateTicketDto dto)
         {
             var userId = CurrentUserId;
 
-            // Optionale Zusatz-Kontakte (per E-Mail) in IDs auflösen.
-            // Existenz wurde bereits im DTO via [ExistsInColumn] geprüft.
+            // zusatzkontakte per mail auflösen, existenz bereits im dto geprüft
             int? additionalUserId1 = await ResolveUserIdOrNull(dto.AssignedUserMail1);
             int? additionalUserId2 = await ResolveUserIdOrNull(dto.AssignedUserMail2);
             int? additionalUserId3 = await ResolveUserIdOrNull(dto.AssignedUserMail3);
 
-            // Abteilung -> Id (Existenz im DTO geprüft).
             int departmentId = await _context.Departments
                 .Where(d => d.Name == dto.DepartmentName)
                 .Select(d => d.Id)
                 .FirstAsync();
 
-            // Subject: existiert es schon? Sonst neu (unverifiziert) anlegen.
+            // subject nachschlagen, sonst unverifiziert neu anlegen
             int subjectId = await _context.Subjects
                 .Where(s => s.Title == dto.SubjectName)
                 .Select(s => (int?)s.Id)
@@ -81,6 +80,8 @@ namespace TicketApplication.Controllers
                 ActualResult = dto.ActualResult,
                 AgreedBilling = dto.AgreedBilling,
                 AgreedAGB = dto.AgreedAGB,
+                ReferenceTicketId = dto.ReferenceTicketId,
+                ReferenceComment = dto.ReferenceComment?.Trim() ?? string.Empty,
                 Status = TicketStatus.Open,
                 AdditionalUserId1 = additionalUserId1,
                 AdditionalUserId2 = additionalUserId2,
@@ -94,30 +95,20 @@ namespace TicketApplication.Controllers
             };
 
             _context.Tickets.Add(ticket);
-            await _context.SaveChangesAsync(); // erst speichern, damit ticket.Id existiert
+            await _context.SaveChangesAsync(); // erst jetzt gibt es ticket.Id
 
-            // Erste Transaktion (Audit-Eintrag) schreiben.
             await WriteTransaction(ticket, userId);
             await _context.SaveChangesAsync();
+
+            _log.Info(LogBereich.Tickets, $"Ticket #{ticket.Id} erstellt von User {userId}: {ticket.Title}");
 
             var result = await ProjectTickets(_context.Tickets.Where(t => t.Id == ticket.Id)).FirstAsync();
             return CreatedAtAction(nameof(GetOne), new { id = ticket.Id }, result);
         }
 
-        // -----------------------------------------------------------------
-        // GET /api/ticket  -> Liste der Tickets (mit Suche & Filter)
-        // User: nur eigene. Support/Admin: alle (für Kanban/Übersicht).
-        //
-        // Optionale Query-Parameter (alle kombinierbar):
-        //   q            Volltext in Titel/Beschreibung
-        //   status       0=Offen, 1=In Bearbeitung, 2=Geschlossen
-        //   activeOnly   true = nur nicht-geschlossene Tickets (Startseite)
-        //   priority     0=Low, 1=Medium, 2=High
-        //   departmentId Abteilungs-Id
-        //   assignedTo   "me" (mir zugewiesen) oder "none" (nicht zugewiesen) – nur Staff
-        //   createdFrom  Erstelldatum ab (inkl.)   – Filter nach Erstellungsdatum
-        //   createdTo    Erstelldatum bis (inkl. ganzer Tag)
-        // -----------------------------------------------------------------
+        // GET api/ticket — liste mit suche/filter
+        // user sieht nur eigene, staff alles
+        // filter: q, status, activeOnly, priority, departmentId, assignedTo (me/none), createdFrom, createdTo
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TicketResponseDto>>> GetAll(
             [FromQuery] string? q,
@@ -131,17 +122,14 @@ namespace TicketApplication.Controllers
         {
             IQueryable<Ticket> query = _context.Tickets;
 
-            // Sichtbarkeit: normale User sehen nur eigene Tickets.
             if (!IsStaff)
                 query = query.Where(t => t.CreatedByUserId == CurrentUserId);
 
-            // --- Filter ---
             if (!string.IsNullOrWhiteSpace(q))
             {
                 var term = q.Trim();
                 query = query.Where(t => t.Title.Contains(term) || t.Description.Contains(term));
             }
-            // activeOnly (Startseite): alles außer geschlossen.
             if (activeOnly)
                 query = query.Where(t => t.Status != TicketStatus.Closed);
             if (status is >= 0 and <= 2)
@@ -151,13 +139,12 @@ namespace TicketApplication.Controllers
             if (departmentId is > 0)
                 query = query.Where(t => t.DepartmentId == departmentId);
 
-            // Filter nach Erstellungsdatum.
             if (createdFrom.HasValue)
                 query = query.Where(t => t.CreatedAt >= createdFrom.Value.Date);
             if (createdTo.HasValue)
                 query = query.Where(t => t.CreatedAt < createdTo.Value.Date.AddDays(1));
 
-            // Zuweisungsfilter nur für Staff sinnvoll.
+            // zuweisungsfilter nur für staff
             if (IsStaff && !string.IsNullOrWhiteSpace(assignedTo))
             {
                 if (assignedTo == "me")
@@ -172,16 +159,13 @@ namespace TicketApplication.Controllers
             return Ok(tickets);
         }
 
-        // -----------------------------------------------------------------
-        // GET /api/ticket/{id}  -> Ein einzelnes Ticket
-        // -----------------------------------------------------------------
+        // GET api/ticket/{id} — einzelnes ticket
         [HttpGet("{id}")]
         public async Task<ActionResult<TicketResponseDto>> GetOne(int id)
         {
             var ticket = await _context.Tickets.FindAsync(id);
             if (ticket == null) return NotFound();
 
-            // Normale User dürfen nur eigene Tickets sehen.
             if (!IsStaff && ticket.CreatedByUserId != CurrentUserId)
                 return Forbid();
 
@@ -189,10 +173,7 @@ namespace TicketApplication.Controllers
             return Ok(dto);
         }
 
-        // -----------------------------------------------------------------
-        // PATCH /api/ticket/{id}  -> Ticket aktualisieren (Felder optional).
-        // Rolle entscheidet, was geändert werden darf.
-        // -----------------------------------------------------------------
+        // PATCH api/ticket/{id} — teilupdate, rolle bestimmt was erlaubt ist
         [HttpPatch("{id}")]
         public async Task<IActionResult> Update(int id, UpdateTicketDto dto)
         {
@@ -211,7 +192,7 @@ namespace TicketApplication.Controllers
                 changed = true;
             }
 
-            // Zuweisung darf nur Staff ändern.
+            // zuweisung nur staff
             if (IsStaff && dto.AssignedToUserMail != null)
             {
                 ticket.AssignedToId = await ResolveUserIdOrNull(dto.AssignedToUserMail);
@@ -266,9 +247,7 @@ namespace TicketApplication.Controllers
             return NoContent();
         }
 
-        // -----------------------------------------------------------------
-        // PATCH /api/ticket/{id}/status  -> Status ändern (Kanban Drag&Drop).
-        // -----------------------------------------------------------------
+        // PATCH api/ticket/{id}/status — statuswechsel (kanban drag&drop)
         [HttpPatch("{id}/status")]
         public async Task<IActionResult> UpdateStatus(int id, UpdateTicketStatusDto dto)
         {
@@ -280,10 +259,9 @@ namespace TicketApplication.Controllers
                 return Forbid();
 
             if (ticket.Status == dto.Status)
-                return NoContent(); // nichts zu tun
+                return NoContent();
 
-            // Wiedereröffnen (Closed -> offen) NUR über den Reopen-Vorgang mit
-            // Pflicht-Nachricht. Über diesen Endpunkt nicht erlaubt.
+            // reopen läuft nur über den reopen-endpunkt (pflicht-nachricht)
             if (ticket.Status == TicketStatus.Closed && dto.Status != TicketStatus.Closed)
                 return BadRequest("Zum Wiedereröffnen bitte den Wiedereröffnen-Vorgang mit Pflicht-Nachricht nutzen.");
 
@@ -293,7 +271,6 @@ namespace TicketApplication.Controllers
             switch (dto.Status)
             {
                 case TicketStatus.InProgress:
-                    // Erstes Mal in Bearbeitung -> Startzeitpunkt festhalten.
                     ticket.OpenedAt ??= DateTime.UtcNow;
                     ticket.ClosedAt = null;
                     break;
@@ -301,21 +278,18 @@ namespace TicketApplication.Controllers
                     ticket.ClosedAt = DateTime.UtcNow;
                     break;
                 case TicketStatus.Open:
-                    // Wieder geöffnet -> Schließzeit zurücksetzen.
                     ticket.ClosedAt = null;
                     break;
             }
 
             await WriteTransaction(ticket, userId);
             await _context.SaveChangesAsync();
+
+            _log.Info(LogBereich.Tickets, $"Ticket #{ticket.Id} Status -> {ticket.Status} durch User {userId}");
             return NoContent();
         }
 
-        // -----------------------------------------------------------------
-        // POST /api/ticket/{id}/reopen  -> Geschlossenes Ticket wiedereröffnen.
-        // Erlaubt für Ersteller und Staff. Eine Nachricht ist PFLICHT und wird
-        // als Dialog-Eintrag gespeichert. Setzt den Status zurück auf Open.
-        // -----------------------------------------------------------------
+        // POST api/ticket/{id}/reopen — geschlossenes ticket wieder öffnen, nachricht ist pflicht
         [HttpPost("{id}/reopen")]
         public async Task<IActionResult> Reopen(int id, ReopenTicketDto dto)
         {
@@ -334,7 +308,6 @@ namespace TicketApplication.Controllers
             ticket.OpenedAt = DateTime.UtcNow;
             ticket.UpdatedAt = DateTime.UtcNow;
 
-            // Pflicht-Nachricht als Dialog-Eintrag festhalten.
             _context.TicketDialogue.Add(new TicketDialogue
             {
                 TicketId = ticket.Id,
@@ -346,13 +319,38 @@ namespace TicketApplication.Controllers
 
             await WriteTransaction(ticket, userId);
             await _context.SaveChangesAsync();
+
+            _log.Info(LogBereich.Tickets, $"Ticket #{ticket.Id} wiedereröffnet durch User {userId}");
+
+            // beteiligte per mail informieren (außer dem auslöser)
+            if (await _mail.IsConfiguredAsync())
+            {
+                var empfaengerIds = new List<int?> { ticket.CreatedByUserId, ticket.AssignedToId }
+                    .Where(x => x != null && x != userId)
+                    .Select(x => x!.Value)
+                    .Distinct()
+                    .ToList();
+                if (empfaengerIds.Count > 0)
+                {
+                    var mails = await _context.Users
+                        .Where(u => empfaengerIds.Contains(u.Id) && u.IsActive)
+                        .Select(u => u.Email)
+                        .ToListAsync();
+                    var link = $"{Request.Scheme}://{Request.Host}/ticket.html?id={ticket.Id}";
+                    foreach (var m in mails)
+                    {
+                        _mailQueue.Enqueue(m,
+                            $"Ticket #{ticket.Id}: Wiedereröffnet - {ticket.Title}",
+                            $"Das Ticket #{ticket.Id} \"{ticket.Title}\" wurde wiedereröffnet.\n\n" +
+                            $"Begründung: {dto.Message.Trim()}\n\nZum Ticket: {link}");
+                    }
+                }
+            }
+
             return NoContent();
         }
 
-        // -----------------------------------------------------------------
-        // PATCH /api/ticket/{id}/assign  -> Ticket einem Bearbeiter zuweisen.
-        // Nur Staff. AssignToEmail = null entfernt die Zuweisung.
-        // -----------------------------------------------------------------
+        // PATCH api/ticket/{id}/assign — bearbeiter setzen/entfernen, nur staff
         [HttpPatch("{id}/assign")]
         [Authorize(Roles = "Admin,Support")]
         public async Task<IActionResult> Assign(int id, AssignTicketDto dto)
@@ -377,14 +375,12 @@ namespace TicketApplication.Controllers
             ticket.UpdatedAt = DateTime.UtcNow;
             await WriteTransaction(ticket, CurrentUserId);
             await _context.SaveChangesAsync();
+
+            _log.Info(LogBereich.Tickets, $"Ticket #{ticket.Id} Zuweisung -> {(ticket.AssignedToId?.ToString() ?? "niemand")} durch User {CurrentUserId}");
             return NoContent();
         }
 
-        // -----------------------------------------------------------------
-        // POST /api/ticket/{id}/read  -> Ticket als "gelesen" markieren.
-        // Wird beim Öffnen der Detailseite aufgerufen; setzt den
-        // Zuletzt-gesehen-Zeitpunkt, wodurch die Antwort-Kennzeichnung verschwindet.
-        // -----------------------------------------------------------------
+        // POST api/ticket/{id}/read — lesezeitpunkt setzen, entfernt "neue antwort"-markierung
         [HttpPost("{id}/read")]
         public async Task<IActionResult> MarkRead(int id)
         {
@@ -413,11 +409,7 @@ namespace TicketApplication.Controllers
             return NoContent();
         }
 
-        // =================================================================
-        // PRIVATE HILFSMETHODEN
-        // =================================================================
-
-        // E-Mail -> User.Id, oder null wenn E-Mail leer/null.
+        // mail -> user-id, null wenn leer oder unbekannt
         private async Task<int?> ResolveUserIdOrNull(string? email)
         {
             if (string.IsNullOrWhiteSpace(email)) return null;
@@ -427,8 +419,7 @@ namespace TicketApplication.Controllers
                 .FirstOrDefaultAsync();
         }
 
-        // Schreibt einen Audit-Eintrag (TicketTransaction) für den aktuellen
-        // Stand des Tickets. TransactionId ist fortlaufend pro Ticket.
+        // audit-eintrag mit aktuellem ticketstand, transactionid fortlaufend pro ticket
         private async Task WriteTransaction(Ticket ticket, int responsibleUserId)
         {
             var nextTransactionId = await _context.TicketTransactions
@@ -453,12 +444,9 @@ namespace TicketApplication.Controllers
             });
         }
 
-        // Projiziert Ticket-Entities auf das angereicherte Response-DTO
-        // (inkl. Namen, E-Mails und Summe der erfassten Minuten).
+        // tickets -> response-dto inkl. namen, mails, minuten und ungelesen-flag
         private IQueryable<TicketResponseDto> ProjectTickets(IQueryable<Ticket> source)
         {
-            // Für die "ungelesene Antwort"-Kennzeichnung: aktueller Nutzer + Rolle
-            // werden als Konstanten in die Query eingebettet.
             int currentUserId = CurrentUserId;
             bool isStaff = IsStaff;
 
@@ -490,11 +478,12 @@ namespace TicketApplication.Controllers
                        DepartmentName = dep != null ? dep.Name : string.Empty,
                        SubjectId = t.SubjectId,
                        SubjectName = sub != null ? sub.Title : string.Empty,
+                       ReferenceTicketId = t.ReferenceTicketId,
+                       ReferenceComment = t.ReferenceComment,
                        TotalMinutes = _context.TicketTimeEntries
                            .Where(e => e.TicketId == t.Id)
                            .Sum(e => (int?)e.Minutes) ?? 0,
-                       // Ungelesene fremde Antwort? Nur für Beteiligte (Ersteller
-                       // oder Bearbeiter). Interne Notizen zählen nur für Staff.
+                       // ungelesene fremde antwort, nur für beteiligte; interne notizen zählen nur für staff
                        HasUnreadReply =
                            (t.CreatedByUserId == currentUserId || t.AssignedToId == currentUserId) &&
                            _context.TicketDialogue.Any(d =>

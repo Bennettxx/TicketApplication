@@ -1,6 +1,6 @@
 namespace TicketApplication.DTOs
 {
-    // Ausgangs-DTO für einen Zeiteintrag.
+    // ausgang für einen zeiteintrag
     public class TimeEntryResponseDto
     {
         public int Id { get; set; }

@@ -1,26 +1,24 @@
 namespace TicketApplication.DTOs
 {
-    // Kennzahlen für das Dashboard. Inhalt ist rollenabhängig:
-    // Staff sieht systemweite Zahlen, ein normaler User nur seine eigenen.
+    // kennzahlen fürs dashboard, staff systemweit, user nur eigene
     public class DashboardDto
     {
         public string Role { get; set; } = string.Empty;
         public bool IsStaff { get; set; }
 
-        // Sichtbarer Bestand (Staff: alle Tickets, User: eigene Tickets)
         public int OpenCount { get; set; }
         public int InProgressCount { get; set; }
         public int ClosedCount { get; set; }
         public int TotalCount { get; set; }
 
-        // Nur für Staff sinnvoll
-        public int MyAssignedOpenCount { get; set; } // mir zugewiesen und nicht geschlossen
-        public int UnassignedOpenCount { get; set; } // offen und niemandem zugewiesen
+        // nur für staff relevant
+        public int MyAssignedOpenCount { get; set; }
+        public int UnassignedOpenCount { get; set; }
 
-        // Anzahl Tickets mit ungelesener fremder Antwort (Benachrichtigung).
+        // tickets mit ungelesener fremder antwort
         public int UnreadReplyCount { get; set; }
 
-        // Letzte Tickets (Kurzform)
+        // letzte tickets, kurzform
         public List<DashboardTicketDto> Recent { get; set; } = new();
     }
 

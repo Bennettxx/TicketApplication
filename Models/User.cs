@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using TicketApplication.Data;
 
 namespace TicketApplication.Models
@@ -6,21 +6,29 @@ namespace TicketApplication.Models
     public class User
     {
         [Key]
-        public int Id { get; set; } = 0;// Primärschlüssel
+        public int Id { get; set; } = 0;
         public string FirstName { get; set; } = string.Empty;
         public string SecondName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string PasswordHash { get; set; } = string.Empty;
-        public UserRole Role { get; set; } = UserRole.User; // Später darf nur der Admin dies anpassen!!!
 
-        // IsActivated: Wird beim Register auf false gesetzt. Ein Admin muss das Konto manuell freischalten.
+        // rolle ändert nur der admin
+        public UserRole Role { get; set; } = UserRole.User;
+
+        // freischaltung durch admin nach registrierung
         public bool IsActivated { get; set; } = false;
 
-        // Angehöriger welcher Abteilung (nur für Support/Admin relevant)
+        // abteilung, nur für rolle user
         public int? DepartmentId { get; set; }
 
-        // IsActive: Soft-Delete-Flag. Wird auf false gesetzt wenn ein Admin den User "ablehnt" oder deaktiviert.
-        // WICHTIG: User werden NIE aus der DB gelöscht, nur deaktiviert!
+        // soft-delete / sperre, user werden nie physisch gelöscht
         public bool IsActive { get; set; } = true;
+
+        // erzwingt passwortwechsel beim nächsten login (default-admin)
+        public bool MustChangePassword { get; set; } = false;
+
+        // mailbestätigung bei registrierung; ohne smtp-konfig direkt true
+        public bool EmailConfirmed { get; set; } = true;
+        public string? EmailConfirmToken { get; set; }
     }
 }

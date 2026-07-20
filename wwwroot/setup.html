@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Ersteinrichtung</title>
+    <style>
+        /* standalone-seite, läuft vor jeder anmeldung */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #2c3e50 0%, #1abc9c 100%);
+        }
+        .box {
+            background: white;
+            padding: 40px 45px;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+            margin: 60px 0;
+            width: 420px;
+            height: fit-content;
+        }
+        h1 { margin-top: 0; color: #2c3e50; }
+        h3 { color: #2c3e50; margin-bottom: 6px; }
+        label { display: block; margin-top: 12px; margin-bottom: 4px; font-weight: bold; color: #2c3e50; font-size: 14px; }
+        input, select {
+            width: 100%; padding: 10px; box-sizing: border-box;
+            border: 1px solid #ccc; border-radius: 6px; font-size: 14px;
+        }
+        button {
+            padding: 11px 18px; margin-top: 14px;
+            background: #28a745; color: white; border: none; border-radius: 6px;
+            cursor: pointer; font-size: 15px;
+        }
+        button.grau { background: #6c757d; }
+        button:disabled { opacity: 0.6; cursor: default; }
+        .mini { font-size: 12px; color: #777; }
+        .ok { color: #28a745; font-weight: bold; }
+        .fehler { color: #dc3545; font-weight: bold; }
+
+        /* info-icon mit hover-tooltip */
+        .info {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 17px; height: 17px; border-radius: 50%;
+            background: #2c3e50; color: white; font-size: 12px; font-style: italic;
+            font-family: Georgia, serif; cursor: help; position: relative;
+            vertical-align: middle; margin-left: 6px;
+        }
+        .info .tooltip {
+            display: none; position: absolute; left: 24px; top: -8px; z-index: 5;
+            width: 320px; background: #2c3e50; color: white;
+            font-size: 12.5px; font-style: normal; font-family: 'Segoe UI', Arial, sans-serif;
+            font-weight: normal; padding: 10px 14px; border-radius: 8px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.3); line-height: 1.5;
+        }
+        .info:hover .tooltip { display: block; }
+        .ergebnis { background: #eaf6ff; border: 1px solid #b6e0fe; border-radius: 8px; padding: 14px; margin-top: 14px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>Ersteinrichtung</h1>
+        <p class="mini">
+            Die Anwendung ist noch nicht eingerichtet. Bitte die Verbindung zur
+            SQL-Server-Datenbank angeben. Die Daten werden verschlüsselt auf diesem
+            Rechner gespeichert.
+        </p>
+
+        <div id="formular">
+            <h3>Datenbank</h3>
+            <label>SQL-Server (z.B. localhost oder SERVER\INSTANZ)</label>
+            <input type="text" id="server" placeholder="localhost">
+
+            <label>Datenbankname</label>
+            <input type="text" id="datenbank" placeholder="TicketApplicationDB">
+
+            <label>Anmeldung
+                <span class="info">i
+                    <span class="tooltip">
+                        <b>Windows-Anmeldung:</b> nutzt das Windows-Konto, unter dem die Anwendung läuft –
+                        kein Passwort in der Konfiguration. Sinnvoll, wenn die App unter einem Benutzer-
+                        oder Dienstkonto mit SQL-Rechten läuft.<br><br>
+                        <b>SQL-Server-Benutzer:</b> eigenes Login direkt am SQL Server. Sinnvoll bei
+                        Betrieb als Windows-Dienst oder wenn der SQL Server auf einem anderen Rechner liegt.
+                    </span>
+                </span>
+            </label>
+            <select id="authArt" onchange="authUmschalten()">
+                <option value="windows">Windows-Anmeldung</option>
+                <option value="sql">SQL-Server-Benutzer</option>
+            </select>
+
+            <div id="sqlAuth" style="display:none;">
+                <label>SQL-Benutzer</label>
+                <input type="text" id="dbUser">
+                <label>SQL-Passwort</label>
+                <input type="password" id="dbPasswort">
+            </div>
+
+            <h3 style="margin-top:22px;">Logging</h3>
+            <label>Log-Verzeichnis (leer = Ordner "Logs" neben der Anwendung)</label>
+            <input type="text" id="logPfad" placeholder="C:\TicketSystem\Logs">
+
+            <button class="grau" onclick="testen()">Verbindung testen</button>
+            <button onclick="abschliessen()" id="btnFertig">Speichern &amp; Initialisieren</button>
+            <p id="feedback"></p>
+        </div>
+
+        <div id="fertig" style="display:none;">
+            <div class="ergebnis">
+                <p class="ok">✔ Einrichtung abgeschlossen!</p>
+                <p>Standard-Administrator:</p>
+                <p><b>E-Mail:</b> <span id="adminMail"></span><br>
+                   <b>Passwort:</b> <span id="adminPw"></span></p>
+                <p class="mini">Beim ersten Login muss das Passwort geändert werden.</p>
+            </div>
+            <button onclick="location.href='/index.html'">Zum Login</button>
+        </div>
+    </div>
+
+    <script>
+        // felder für sql-auth ein/ausblenden
+        function authUmschalten() {
+            const sql = document.getElementById('authArt').value === 'sql';
+            document.getElementById('sqlAuth').style.display = sql ? 'block' : 'none';
+        }
+
+        // eingaben einsammeln
+        function daten() {
+            const sql = document.getElementById('authArt').value === 'sql';
+            return {
+                server: document.getElementById('server').value.trim(),
+                database: document.getElementById('datenbank').value.trim(),
+                useWindowsAuth: !sql,
+                user: sql ? document.getElementById('dbUser').value.trim() : null,
+                password: sql ? document.getElementById('dbPasswort').value : null,
+                logPath: document.getElementById('logPfad').value.trim() || null
+            };
+        }
+
+        function setFeedback(text, ok) {
+            const fb = document.getElementById('feedback');
+            fb.textContent = text;
+            fb.className = ok ? 'ok' : 'fehler';
+        }
+
+        // verbindungstest ohne zu speichern
+        async function testen() {
+            const d = daten();
+            if (!d.server || !d.database) { setFeedback('Server und Datenbankname sind Pflicht.', false); return; }
+            setFeedback('Teste Verbindung...', true);
+            try {
+                const res = await fetch('/api/setup/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(d)
+                });
+                const b = await res.json();
+                setFeedback(b.message || 'Unbekannte Antwort.', b.ok === true);
+            } catch {
+                setFeedback('Server nicht erreichbar.', false);
+            }
+        }
+
+        // config speichern, db anlegen, default-admin anzeigen
+        async function abschliessen() {
+            const d = daten();
+            if (!d.server || !d.database) { setFeedback('Server und Datenbankname sind Pflicht.', false); return; }
+            document.getElementById('btnFertig').disabled = true;
+            setFeedback('Initialisiere...', true);
+            try {
+                const res = await fetch('/api/setup/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(d)
+                });
+                if (res.ok) {
+                    const b = await res.json();
+                    document.getElementById('adminMail').textContent = b.adminEmail;
+                    document.getElementById('adminPw').textContent = b.adminPassword;
+                    document.getElementById('formular').style.display = 'none';
+                    document.getElementById('fertig').style.display = 'block';
+                } else {
+                    let msg = 'Einrichtung fehlgeschlagen.';
+                    try {
+                        const b = await res.json();
+                        if (typeof b === 'string') msg = b;
+                        else if (b.errors) msg = Object.values(b.errors).flat().join(' ');
+                        else if (b.title) msg = b.title;
+                    } catch {
+                        const t = await res.text().catch(() => '');
+                        if (t) msg = t;
+                    }
+                    setFeedback(msg, false);
+                    document.getElementById('btnFertig').disabled = false;
+                }
+            } catch {
+                setFeedback('Server nicht erreichbar.', false);
+                document.getElementById('btnFertig').disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

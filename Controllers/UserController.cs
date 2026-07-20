@@ -1,36 +1,30 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using TicketApplication.Data;
 using TicketApplication.DTOs;
 using TicketApplication.Models;
+using TicketApplication.Services;
 
 namespace TicketApplication.Controllers
 {
-    // Dieser Controller ist für die Verwaltung der User zuständig
-    // Er bietet Endpunkte für CRUD-Operationen (Create, Read, Update, Delete) auf User-Objekten
-    // Alle Endpunkte in diesem Controller haben die Basis-URL "api/user"
-
-
-    // Mal gucken was wir mit den Controller machen ... er ist irgendwie zwecklos
-    
+    // benutzerverwaltung, basis-url api/user
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
     public class UserController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly LogService _log;
 
-        public UserController(ApplicationDbContext context)
+        public UserController(ApplicationDbContext context, LogService log)
         {
             _context = context;
+            _log = log;
         }
 
-        // GET /api/user/me  ->  Eigene Identität (Id, E-Mail, Rolle).
-        // Wird vom Frontend gebraucht, um Benutzername anzuzeigen und die
-        // Navigation rollenabhängig (Kanban/Statistik nur für Staff) aufzubauen.
+        // GET api/user/me — eigene identität fürs frontend (name, rolle, navigation)
         [HttpGet("me")]
         public async Task<ActionResult<UserResponseDto>> GetMe()
         {
@@ -48,28 +42,27 @@ namespace TicketApplication.Controllers
                 Email = user.Email,
                 Role = user.Role.ToString(),
                 IsActivated = user.IsActivated,
+                IsActive = user.IsActive,
                 DepartmentId = user.DepartmentId,
                 DepartmentName = await DepartmentName(user.DepartmentId)
             });
         }
 
-
+        // GET api/user — alle user inkl. gesperrter, passworthash bleibt im haus
         [HttpGet(Name = "GetUsers")]
         [Authorize(Roles = "Admin, Support")]
         public async Task<ActionResult<IEnumerable<UserResponseDto>>> Get()
         {
             var users = await _context.Users
-                .Where(u => u.IsActive)
-                // Select() projiziert jedes User-Objekt in ein UserResponseDto
-                // So verlässt das PasswordHash niemals den Server
                 .Select(u => new UserResponseDto
                 {
                     Id = u.Id,
                     FirstName = u.FirstName,
                     SecondName = u.SecondName,
                     Email = u.Email,
-                    Role = u.Role.ToString(),  // Enum → lesbarer String (z.B. "Admin")
+                    Role = u.Role.ToString(),
                     IsActivated = u.IsActivated,
+                    IsActive = u.IsActive,
                     DepartmentId = u.DepartmentId,
                     DepartmentName = _context.Departments
                         .Where(d => d.Id == u.DepartmentId)
@@ -81,12 +74,13 @@ namespace TicketApplication.Controllers
             return Ok(users);
         }
 
+        // GET api/user/{id} — einzelner user
         [HttpGet("{id}")]
         [Authorize(Roles = "Admin, Support")]
         public async Task<ActionResult<UserResponseDto>> Get(int id)
         {
             var user = await _context.Users.FindAsync(id);
-            if (user == null || !user.IsActive)
+            if (user == null)
                 return NotFound();
 
             return Ok(new UserResponseDto
@@ -97,11 +91,13 @@ namespace TicketApplication.Controllers
                 Email = user.Email,
                 Role = user.Role.ToString(),
                 IsActivated = user.IsActivated,
+                IsActive = user.IsActive,
                 DepartmentId = user.DepartmentId,
                 DepartmentName = await DepartmentName(user.DepartmentId)
             });
         }
 
+        // POST api/user — user anlegen (admin), sofort freigeschaltet
         [HttpPost]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<UserResponseDto>> Post(CreateUserDto dto)
@@ -112,14 +108,12 @@ namespace TicketApplication.Controllers
             if (emailExists)
                 return BadRequest("Diese Email-Adresse wird bereits verwendet.");
 
-            // Abteilung auflösen (Existenz im DTO geprüft).
-            // WICHTIG: Nur die Rolle User bekommt eine Abteilung;
-            // Admin/Support haben grundsätzlich keine.
+            // abteilung nur für rolle user
             int? departmentId = dto.Role == UserRole.User
                 ? await ResolveDepartmentId(dto.DepartmentName)
                 : null;
 
-            // Wir bauen den User selbst zusammen — der Caller hat keine Kontrolle über Id, IsActive etc.
+            // objekt wird serverseitig gebaut, client hat keine kontrolle über id/flags
             var user = new User
             {
                 FirstName = dto.FirstName,
@@ -129,13 +123,14 @@ namespace TicketApplication.Controllers
                 Role = dto.Role,
                 DepartmentId = departmentId,
                 IsActive = true,
-                IsActivated = true  // Vom Admin angelegte User sind sofort freigeschaltet
+                IsActivated = true
             };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // Wir geben ein UserResponseDto zurück, nicht den rohen User
+            _log.Info(LogBereich.Benutzer, $"User angelegt durch Admin: {user.Email} (Rolle {user.Role})");
+
             return CreatedAtAction(nameof(Get), new { id = user.Id }, new UserResponseDto
             {
                 Id = user.Id,
@@ -144,11 +139,13 @@ namespace TicketApplication.Controllers
                 Email = user.Email,
                 Role = user.Role.ToString(),
                 IsActivated = user.IsActivated,
+                IsActive = user.IsActive,
                 DepartmentId = user.DepartmentId,
                 DepartmentName = await DepartmentName(user.DepartmentId)
             });
         }
 
+        // PUT api/user/{id} — teilupdate durch admin, nur gesetzte felder
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Put(int id, UpdateUserDto dto)
@@ -157,7 +154,6 @@ namespace TicketApplication.Controllers
             if (user == null)
                 return NotFound();
 
-            // Wir überschreiben nur die Felder die der Admin ändern darf
             if (dto.FirstName != null)
             {
                 if (dto.FirstName.Trim() == string.Empty)
@@ -184,8 +180,7 @@ namespace TicketApplication.Controllers
             }
             if (dto.Role.HasValue) user.Role = dto.Role.Value;
 
-            // Abteilung nur für Rolle User; Admin/Support haben keine.
-            // Bei Rollenwechsel zu Staff wird eine bestehende Abteilung entfernt.
+            // abteilung nur für rolle user, bei staff wird sie entfernt
             if (user.Role == UserRole.User)
             {
                 if (dto.DepartmentName != null)
@@ -198,7 +193,7 @@ namespace TicketApplication.Controllers
 
             if (dto.IsActivated.HasValue) user.IsActivated = dto.IsActivated.Value;
             if (dto.IsActive.HasValue) user.IsActive = dto.IsActive.Value;
-            // user.PasswordHash bleibt unberührt!
+            // passworthash bleibt unberührt
 
             try
             {
@@ -211,11 +206,11 @@ namespace TicketApplication.Controllers
                 throw;
             }
 
+            _log.Info(LogBereich.Benutzer, $"User geändert: {user.Email} (Id {user.Id}, Rolle {user.Role}, Aktiv {user.IsActive})");
             return NoContent();
         }
 
-        // Soft-Delete: User werden NIE physisch aus der DB entfernt, nur deaktiviert (IsActive=false).
-        // Genutzt für: Ablehnung einer Registrierung ODER nachträgliche Sperrung eines aktiven Users.
+        // DELETE api/user/{id} — soft-delete, setzt nur IsActive=false
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
@@ -229,11 +224,11 @@ namespace TicketApplication.Controllers
             user.IsActive = false;
             await _context.SaveChangesAsync();
 
+            _log.Info(LogBereich.Benutzer, $"User deaktiviert/abgelehnt: {user.Email} (Id {user.Id})");
             return NoContent();
         }
 
-        // GET /api/user/pending  →  Liste aller offenen Registrierungs-Anträge
-        // Sichtbar für Admin und Support; nur Admin darf tatsächlich freischalten (siehe Approve unten).
+        // GET api/user/pending — offene registrierungen (aktiv, aber nicht freigeschaltet)
         [HttpGet("pending")]
         [Authorize(Roles = "Admin, Support")]
         public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetPending()
@@ -248,6 +243,8 @@ namespace TicketApplication.Controllers
                     Email = u.Email,
                     Role = u.Role.ToString(),
                     IsActivated = u.IsActivated,
+                    IsActive = u.IsActive,
+                    EmailConfirmed = u.EmailConfirmed,
                     DepartmentId = u.DepartmentId,
                     DepartmentName = _context.Departments
                         .Where(d => d.Id == u.DepartmentId)
@@ -259,8 +256,7 @@ namespace TicketApplication.Controllers
             return Ok(pending);
         }
 
-        // POST /api/user/{id}/approve  →  Registrierung freischalten
-        // Nur Admin darf das.
+        // POST api/user/{id}/approve — registrierung freischalten, nur admin
         [HttpPost("{id}/approve")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Approve(int id)
@@ -275,6 +271,7 @@ namespace TicketApplication.Controllers
             user.IsActivated = true;
             await _context.SaveChangesAsync();
 
+            _log.Info(LogBereich.Benutzer, $"Registrierung freigeschaltet: {user.Email} (Id {user.Id})");
             return NoContent();
         }
 
@@ -283,7 +280,7 @@ namespace TicketApplication.Controllers
             return _context.Users.Any(e => e.Id == id);
         }
 
-        // E-Mail-/Namens-unabhängige Helfer für die Abteilung.
+        // abteilungsname -> id, null wenn leer/unbekannt
         private async Task<int?> ResolveDepartmentId(string? name)
         {
             if (string.IsNullOrWhiteSpace(name)) return null;
@@ -293,6 +290,7 @@ namespace TicketApplication.Controllers
                 .FirstOrDefaultAsync();
         }
 
+        // abteilungs-id -> name
         private async Task<string?> DepartmentName(int? departmentId)
         {
             if (departmentId == null) return null;

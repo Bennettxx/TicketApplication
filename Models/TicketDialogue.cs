@@ -1,17 +1,14 @@
 namespace TicketApplication.Models
 {
-    // Eine einzelne Chat-Nachricht innerhalb eines Tickets.
-    // Bildet die Dialog-/Chatfunktion ab: Kunde und Support schreiben sich
-    // hier abwechselnd. Jede Nachricht ist ein eigener Datensatz mit eigener Id.
+    // einzelne chat-nachricht zu einem ticket
     public class TicketDialogue
     {
-        public int Id { get; set; }                 // Primärschlüssel (Auto-Increment)
-        public int TicketId { get; set; }           // FK -> Ticket.Id, zu welchem Ticket gehört die Nachricht
-        public int AuthorUserId { get; set; }       // FK -> User.Id, wer hat geschrieben
+        public int Id { get; set; }
+        public int TicketId { get; set; }
+        public int AuthorUserId { get; set; }
         public string Text { get; set; } = string.Empty;
 
-        // Interne Notiz: Nur für Admin/Support sichtbar, NICHT für den Kunden.
-        // Normale User können das niemals auf true setzen (wird im Controller erzwungen).
+        // interne notiz, nur für admin/support sichtbar
         public bool IsInternal { get; set; } = false;
 
         public DateTime CreatedAt { get; set; }

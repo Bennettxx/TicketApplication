@@ -5,7 +5,7 @@
     <title>Problem melden</title>
     <link rel="stylesheet" href="/style.css">
     <style>
-        /* Standalone-Seite: funktioniert mit UND ohne Login, daher KEIN app.js. */
+        /* standalone-seite, läuft mit und ohne login, deshalb kein app.js */
         body { display: block; }
         .wrap { max-width: 640px; margin: 40px auto; padding: 0 16px; }
         .kopf { display: flex; justify-content: space-between; align-items: center; }
@@ -45,7 +45,7 @@
     <script>
         const TOKEN = localStorage.getItem('meinToken');
 
-        // Eingeloggt: E-Mail vorbefüllen (bleibt änderbar), Zurück-Link anpassen.
+        // eingeloggt: e-mail vorbefüllen, zurück-link anpassen
         (async function () {
             if (!TOKEN) return;
             document.getElementById('zurueck').href = '/startseite.html';
@@ -56,9 +56,10 @@
                     const mich = await res.json();
                     if (mich.email) document.getElementById('email').value = mich.email;
                 }
-            } catch { /* ignore */ }
+            } catch { }
         })();
 
+        // meldung absenden, mit token wird der ersteller erfasst
         async function senden() {
             const fb = document.getElementById('feedback');
             const titel = document.getElementById('titel').value.trim();
@@ -72,7 +73,7 @@
             }
 
             const headers = { 'Content-Type': 'application/json' };
-            if (TOKEN) headers['Authorization'] = `Bearer ${TOKEN}`; // eingeloggt -> Ersteller wird erfasst
+            if (TOKEN) headers['Authorization'] = `Bearer ${TOKEN}`;
 
             try {
                 const res = await fetch('/api/problem', {

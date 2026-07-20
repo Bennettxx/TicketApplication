@@ -1,24 +1,17 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
-using Scalar.AspNetCore;
-using System.Diagnostics.Eventing.Reader;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using TicketApplication.Data;
+using TicketApplication.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
-
-// CORS - Cross-Origin Resource Sharing konfigurieren:
-// das ist notwendig, damit  JS-Oberfläche (Frontend) 
-// auf die API (Backend) zugreifen darf, auch wenn sie auf unterschiedlichen Ports laufen
+// cors: frontend darf api aufrufen, auch von anderem port
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -28,21 +21,9 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader();
     });
 });
-// =========================================================================
-// KONFIGURATION – abhängig von der Umgebung
-//
-//  DEVELOPMENT: Werte kommen aus 'appsettings.Local.json' (maschinenspezifisch,
-//               steht in .gitignore). Fehlende Schlüssel (JWT/Anhang) werden
-//               automatisch erzeugt und dort gespeichert.
-//
-//  PRODUCTION:  Werte kommen ausschließlich aus UMGEBUNGSVARIABLEN
-//               (ConnectionStrings__DefaultConnection, Jwt__Key,
-//               Attachments__Key). Details: ANLEITUNG_UMGEBUNGSVARIABLEN.txt.
-//
-// Umgebungsvariablen sind vom Default-Host bereits als Konfigurationsquelle
-// registriert; wir laden die lokale JSON nur in der Entwicklung, damit sie in
-// Produktion NICHT die Umgebungsvariablen überschreibt.
-// =========================================================================
+
+// dev: appsettings.Local.json laden, fehlende keys automatisch erzeugen
+// prod: security-keys aus umgebungsvariablen (siehe ANLEITUNG_UMGEBUNGSVARIABLEN.txt)
 if (builder.Environment.IsDevelopment())
 {
     builder.Configuration.AddJsonFile(
@@ -50,25 +31,11 @@ if (builder.Environment.IsDevelopment())
         optional: true,
         reloadOnChange: true);
 
-    // Fehlende Schlüssel lokal automatisch erzeugen und in Local.json ablegen.
     EnsureJwtKeyExists(builder);
     EnsureAttachmentKeyExists(builder);
 }
 
-// Connection-String prüfen — sonst kommt später eine sehr kryptische
-// Fehlermeldung aus dem EF-Core-Innern.
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-if (string.IsNullOrWhiteSpace(connectionString))
-{
-    throw new InvalidOperationException(
-        "ConnectionStrings:DefaultConnection ist nicht konfiguriert. " +
-        "Development: 'appsettings.Local.json' anlegen. " +
-        "Production: Umgebungsvariable 'ConnectionStrings__DefaultConnection' setzen " +
-        "(siehe ANLEITUNG_UMGEBUNGSVARIABLEN.txt).");
-}
-
-// In Produktion müssen die sicherheitsrelevanten Schlüssel per Umgebungsvariable
-// gesetzt sein — es wird dort NICHTS automatisch generiert/geschrieben.
+// prod: security-keys müssen gesetzt sein, hier wird nichts generiert
 if (!builder.Environment.IsDevelopment())
 {
     if (string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Key"]))
@@ -79,17 +46,31 @@ if (!builder.Environment.IsDevelopment())
             "Attachments:Key fehlt. In Produktion Umgebungsvariable 'Attachments__Key' setzen (siehe ANLEITUNG_UMGEBUNGSVARIABLEN.txt).");
 }
 
-// Add services to the container. Auch Dependency Injection genannt - welche Services stehen später zur Verfügung.
+// eigene services: geschützte config, datei-logging, mail-queue + versand
+builder.Services.AddSingleton<AppConfigService>();
+builder.Services.AddSingleton<LogService>();
+builder.Services.AddSingleton<MailQueue>();
+builder.Services.AddScoped<MailService>();
+builder.Services.AddHostedService<MailDispatcherService>();
+builder.Services.AddHostedService<LogCleanupService>();
 
-// Hier binden wir die DB an die App, damit wir später in den Controllern darauf zugreifen können
-// DbContext ist die Klasse, die die DB abbildet und den Zugriff ermöglicht
-// Für debugging .LogTo(Console.WriteLine, LogLevel.Information)    Dieses später auskommentieren!
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString).LogTo(Console.WriteLine, LogLevel.Information));
+// db-context: connection-string kommt zur laufzeit aus der app-config
+// (ohne config läuft die app im setup-modus, dann wird der context nicht benutzt)
+builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
+{
+    var cfg = sp.GetRequiredService<AppConfigService>();
+    var cs = cfg.GetConnectionString();
+    if (!string.IsNullOrWhiteSpace(cs))
+    {
+        options.UseSqlServer(cs);
+        if (builder.Environment.IsDevelopment())
+            options.LogTo(Console.WriteLine, LogLevel.Information);
+    }
+});
 
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();
 
+// jwt-bearer auth, token wird gegen key/issuer/audience geprüft
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -102,34 +83,73 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
         };
     });
 
 builder.Services.AddAuthorization();
 
-// App-Objekt wird erstellt mit oben implementierten Var etc.
-// Ab dem Build() können keine neuen Services hinzugefügt werden, sondern nurnoch der Ablaufplan (Middelware)
 var app = builder.Build();
 
-// Ab hier können wir den Ablaufplan der App festlegen (Middelware)
+var appConfig = app.Services.GetRequiredService<AppConfigService>();
+var logService = app.Services.GetRequiredService<LogService>();
 
-// Hier können wir festlegen, welche Routen für die API-Dokumentation zuständig sind
-// In der Entwicklungsumgebung wollen wir die API-Dokumentation sehen, in Produktion nicht
-if (app.Environment.IsDevelopment())
+// unbehandelte fehler in fehler-log schreiben
+app.Use(async (context, next) =>
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
-}
+    try
+    {
+        await next();
+    }
+    catch (Exception ex)
+    {
+        logService.Error(LogBereich.Fehler, $"{context.Request.Method} {context.Request.Path}", ex);
+        throw;
+    }
+});
 
-// Leitet HTTP Aufrufe als HTTPS weiter
+// technisches request-log (nur bei aktivem debug-modus): methode, pfad, status, dauer
+app.Use(async (context, next) =>
+{
+    var sw = System.Diagnostics.Stopwatch.StartNew();
+    await next();
+    sw.Stop();
+    if (context.Request.Path.StartsWithSegments("/api"))
+    {
+        logService.Debug(LogBereich.Http,
+            $"{context.Request.Method} {context.Request.Path}{context.Request.QueryString} -> {context.Response.StatusCode} ({sw.ElapsedMilliseconds} ms)");
+    }
+});
+
 app.UseHttpsRedirection();
-app.UseDefaultFiles(); // Sucht automatisch nach der index.html
 
-// Statische Dateien (HTML/CSS/JS) ausliefern.
-// In der ENTWICKLUNG setzen wir "no-cache", damit der Browser Änderungen an
-// wwwroot-Dateien SOFORT sieht und nicht eine alte Version aus dem Cache zeigt.
-// (Das war die Ursache, warum Frontend-Fixes scheinbar nicht ankamen.)
+// setup-modus: ohne db-config alles auf setup.html umleiten
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
+    if (!appConfig.IsConfigured)
+    {
+        bool erlaubt = path.StartsWith("/api/setup")
+            || path == "/setup.html"
+            || path.EndsWith(".css") || path.EndsWith(".js")
+            || path.EndsWith(".png") || path.EndsWith(".ico");
+        if (!erlaubt)
+        {
+            context.Response.Redirect("/setup.html");
+            return;
+        }
+    }
+    else if (path == "/setup.html")
+    {
+        context.Response.Redirect("/index.html");
+        return;
+    }
+    await next();
+});
+
+app.UseDefaultFiles();
+
+// statische dateien; im dev-modus cache aus, damit frontend-änderungen sofort ankommen
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
@@ -143,13 +163,12 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 
-// Aktiviert oben definierte CORS-Regel "AllowAll"
-// Muss vor app.UseAuthentication() stehen, damit der Browser die Erlaubnis
-// bekommt bevor er versucht sich einzuloggen.
+// cors vor auth, sonst blockt der browser den login
 app.UseCors("AllowAll");
 
 app.UseAuthentication();
 
+// dev-hintertür: header "Authorization: Dev-Admin" = admin ohne login
 if (app.Environment.IsDevelopment())
 {
     app.Use(async (context, next) =>
@@ -162,7 +181,6 @@ if (app.Environment.IsDevelopment())
                 new Claim(ClaimTypes.Name, "DevAdmin"),
                 new Claim(ClaimTypes.Role, "Admin")
             };
-            // "DevAuth" als AuthenticationType macht IsAuthenticated = true
             var identity = new ClaimsIdentity(claims, "DevAuth");
             context.User = new ClaimsPrincipal(identity);
         }
@@ -170,52 +188,79 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// passwort-zwangswechsel: solange das flag gesetzt ist, sind nur
+// login/logout, profil lesen und passwort ändern erlaubt
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
+    if (context.User?.Identity?.IsAuthenticated == true && path.StartsWith("/api"))
+    {
+        bool erlaubt = path.StartsWith("/api/auth")
+            || path == "/api/account/me/password"
+            || path == "/api/account/me"
+            || path == "/api/user/me";
+        if (!erlaubt)
+        {
+            var idStr = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (int.TryParse(idStr, out var uid) && uid > 0)
+            {
+                var db = context.RequestServices.GetRequiredService<ApplicationDbContext>();
+                var muss = await db.Users
+                    .Where(u => u.Id == uid)
+                    .Select(u => u.MustChangePassword)
+                    .FirstOrDefaultAsync();
+                if (muss)
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    await context.Response.WriteAsync("Bitte zuerst das Passwort ändern (Mein Profil).");
+                    return;
+                }
+            }
+        }
+    }
+    await next();
+});
+
 app.UseAuthorization();
 
-// Hier werden die Controller-Routen aktiviert, damit die App auf HTTP-Anfragen reagieren kann
 app.MapControllers();
 
-// Hier kann man ergänzen was vor dem Start geschehen soll (unabhängig der Bedienung der App)
-
-// Wir erstellen einen Scope, damit wir die DB-Initialisierung durchführen können
-using (var scope = app.Services.CreateScope())
+// db anlegen + startdaten, nur wenn eine verbindung konfiguriert ist
+if (appConfig.IsConfigured)
 {
-    var services = scope.ServiceProvider;
-    // Wir holen uns den 'Dolmetscher' aus dem System
-    var context = services.GetRequiredService<ApplicationDbContext>();
-
-    // Wir rufen unsere neue Klasse auf
-    DbInitializer.Initialize(context);
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        DbInitializer.Initialize(context, app.Environment.IsDevelopment());
+        logService.Info(LogBereich.App, "Anwendung gestartet, Datenbank initialisiert.");
+        logService.Debug(LogBereich.App,
+            $"Umgebung={app.Environment.EnvironmentName}, LogPath={appConfig.LogPath}, DebugLogging=an, LegacyConfig={appConfig.IsLegacyFallback}");
+    }
+    catch (Exception ex)
+    {
+        logService.Error(LogBereich.App, "Datenbank-Initialisierung beim Start fehlgeschlagen.", ex);
+    }
+}
+else
+{
+    logService.Info(LogBereich.App, "Anwendung im Setup-Modus gestartet (keine DB-Konfiguration).");
 }
 
 app.Run();
 
-
-// =========================================================================
-// HILFSFUNKTIONEN
-// =========================================================================
-
-// Stellt sicher dass ein JWT-Signing-Key existiert.
-// Wenn keiner in der Konfiguration steht (z.B. allererster Start nach Klonen
-// des Repos), generieren wir einen kryptographisch sicheren Zufallswert und
-// speichern ihn in appsettings.Local.json. Jede lokale Installation bekommt
-// so automatisch ihren eigenen einzigartigen Schlüssel.
+// jwt-key sicherstellen: falls keiner konfiguriert ist, zufallskey erzeugen
+// und in appsettings.Local.json ablegen (nur dev)
 static void EnsureJwtKeyExists(WebApplicationBuilder builder)
 {
     var existingKey = builder.Configuration["Jwt:Key"];
     if (!string.IsNullOrWhiteSpace(existingKey))
-        return;  // Key vorhanden — nichts zu tun.
+        return;
 
-    // 32 Bytes = 256 Bits Entropie. In Hex codiert ergibt das 64 Zeichen.
-    // RandomNumberGenerator ist der OS-gestützte Krypto-Zufallsgenerator
-    // (NICHT das normale Random — das wäre für Sicherheitszwecke ungeeignet).
     var randomBytes = new byte[32];
     RandomNumberGenerator.Fill(randomBytes);
     var newKey = Convert.ToHexString(randomBytes);
 
-    // appsettings.Local.json laden (falls vorhanden), den Jwt:Key setzen,
-    // wieder zurückschreiben. Wir merge'n — bestehende Werte wie der
-    // ConnectionString bleiben unangetastet.
     var localJsonPath = Path.Combine(builder.Environment.ContentRootPath, "appsettings.Local.json");
     JsonObject root;
     if (File.Exists(localJsonPath))
@@ -240,8 +285,6 @@ static void EnsureJwtKeyExists(WebApplicationBuilder builder)
     var writeOptions = new JsonSerializerOptions { WriteIndented = true };
     File.WriteAllText(localJsonPath, root.ToJsonString(writeOptions));
 
-    // Konfiguration neu laden, damit der frisch geschriebene Key sofort
-    // im laufenden builder.Configuration verfügbar ist.
     ((IConfigurationRoot)builder.Configuration).Reload();
 
     Console.WriteLine("================================================================");
@@ -251,16 +294,14 @@ static void EnsureJwtKeyExists(WebApplicationBuilder builder)
     Console.WriteLine("================================================================");
 }
 
-// Stellt sicher, dass ein 32-Byte-Schlüssel (Base64) für die AES-GCM-
-// Verschlüsselung privater Anhänge existiert. Wird wie der JWT-Key beim ersten
-// Start erzeugt und in appsettings.Local.json gespeichert.
+// aes-key für private anhänge sicherstellen, gleiche logik wie beim jwt-key
 static void EnsureAttachmentKeyExists(WebApplicationBuilder builder)
 {
     var existingKey = builder.Configuration["Attachments:Key"];
     if (!string.IsNullOrWhiteSpace(existingKey))
         return;
 
-    var randomBytes = new byte[32]; // 256 Bit
+    var randomBytes = new byte[32];
     RandomNumberGenerator.Fill(randomBytes);
     var newKey = Convert.ToBase64String(randomBytes);
 

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Statistik</title>
     <link rel="stylesheet" href="/style.css">
-    <!-- Chart.js via CDN (benötigt Internetzugang beim Laden der Seite) -->
+    <!-- chart.js vom cdn, braucht internet beim laden -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <style>
         .diagramme { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -16,6 +16,13 @@
             vertical-align: middle; margin-right: 8px;
         }
         h2 { color: #2c3e50; margin-top: 30px; }
+
+        .modus { display: flex; gap: 8px; margin-bottom: 12px; }
+        .modus-btn {
+            background: white; color: #2c3e50; border: 2px solid #ccc;
+            border-radius: 8px; padding: 8px 16px; cursor: pointer; font-size: 14px;
+        }
+        .modus-btn.aktiv { background: #2c3e50; color: white; border-color: #2c3e50; }
     </style>
 </head>
 <body>
@@ -25,6 +32,13 @@
         <span class="benutzer" id="benutzername">...</span>
         <h1>Statistik</h1>
         <p id="feedback" class="mini"></p>
+
+        <!-- zeitraum: gesamt / 60 / 30 tage -->
+        <div class="modus">
+            <button class="modus-btn aktiv" onclick="setZeitraum(0, this)">Gesamt</button>
+            <button class="modus-btn" onclick="setZeitraum(60, this)">Letzte 60 Tage</button>
+            <button class="modus-btn" onclick="setZeitraum(30, this)">Letzte 30 Tage</button>
+        </div>
 
         <h2>Diagramme</h2>
         <div class="diagramme">
@@ -48,6 +62,10 @@
 
     <script src="/app.js"></script>
     <script>
+        let ZEITRAUM_TAGE = 0;   // 0 = gesamt, sonst tage
+        let CHARTS = [];         // chart-instanzen für neuaufbau
+
+        // seite aufbauen, nur admin
         (async function () {
             await seitenleisteAufbauen('statistik');
             const mich = await getMich();
@@ -56,41 +74,64 @@
                     '<p class="feedback-rot">Kein Zugriff. Nur Admins.</p>';
                 return;
             }
+            await allesLaden();
+        })();
+
+        // query-anhängsel für den gewählten zeitraum
+        function tageParam() {
+            return ZEITRAUM_TAGE > 0 ? '?days=' + ZEITRAUM_TAGE : '';
+        }
+
+        // zeitraum umschalten und alles neu laden
+        async function setZeitraum(tage, btn) {
+            ZEITRAUM_TAGE = tage;
+            document.querySelectorAll('.modus-btn').forEach(b => b.classList.remove('aktiv'));
+            btn.classList.add('aktiv');
+            await allesLaden();
+        }
+
+        // tabellen + diagramme laden
+        async function allesLaden() {
             await abteilungenLaden();
             await agentsLaden();
             await kundenLaden();
             await diagrammeLaden();
-        })();
+        }
 
-        // Diagramme mit Chart.js rendern.
+        // drei diagramme mit chart.js rendern
         async function diagrammeLaden() {
-            if (typeof Chart === 'undefined') return; // CDN nicht geladen (offline)
+            if (typeof Chart === 'undefined') return; // cdn nicht geladen (offline)
             try {
                 const [abt, agents, dash] = await Promise.all([
-                    api('/api/statistics/departments'),
-                    api('/api/statistics/agents'),
+                    api('/api/statistics/departments' + tageParam()),
+                    api('/api/statistics/agents' + tageParam()),
                     api('/api/dashboard')
                 ]);
 
-                new Chart(document.getElementById('chartAbteilung'), {
+                // alte chart-instanzen entsorgen, sonst zeichnet chart.js doppelt
+                CHARTS.forEach(c => c.destroy());
+                CHARTS = [];
+
+                CHARTS.push(new Chart(document.getElementById('chartAbteilung'), {
                     type: 'bar',
                     data: {
                         labels: abt.map(a => a.departmentName),
                         datasets: [{ label: 'Minuten', data: abt.map(a => a.totalMinutes), backgroundColor: '#1abc9c' }]
                     },
                     options: { plugins: { legend: { display: false } }, responsive: true }
-                });
+                }));
 
-                new Chart(document.getElementById('chartAgent'), {
+                CHARTS.push(new Chart(document.getElementById('chartAgent'), {
                     type: 'bar',
                     data: {
                         labels: agents.map(a => a.name || a.email),
                         datasets: [{ label: 'Minuten', data: agents.map(a => a.totalMinutes), backgroundColor: '#2c3e50' }]
                     },
                     options: { indexAxis: 'y', plugins: { legend: { display: false } }, responsive: true }
-                });
+                }));
 
-                new Chart(document.getElementById('chartStatus'), {
+                // status-diagramm zeigt immer den gesamtbestand
+                CHARTS.push(new Chart(document.getElementById('chartStatus'), {
                     type: 'doughnut',
                     data: {
                         labels: ['Offen', 'In Bearbeitung', 'Geschlossen'],
@@ -100,18 +141,19 @@
                         }]
                     },
                     options: { responsive: true }
-                });
+                }));
             } catch (e) {
                 console.error('Diagramme konnten nicht geladen werden', e);
             }
         }
 
-        // Hilfsfunktion: maximale Minuten für Balken-Skalierung.
+        // maximale minuten für die balken-skalierung
         function maxMin(arr) { return Math.max(1, ...arr.map(x => x.totalMinutes)); }
 
+        // abteilungsstatistik als tabelle
         async function abteilungenLaden() {
             try {
-                const abt = await api('/api/statistics/departments');
+                const abt = await api('/api/statistics/departments' + tageParam());
                 const max = maxMin(abt);
                 if (!abt.length) { document.getElementById('abteilungBereich').innerHTML = '<p>Keine Abteilungen.</p>'; return; }
                 document.getElementById('abteilungBereich').innerHTML = `
@@ -137,9 +179,10 @@
             }
         }
 
+        // bearbeiterstatistik als tabelle
         async function agentsLaden() {
             try {
-                const agents = await api('/api/statistics/agents');
+                const agents = await api('/api/statistics/agents' + tageParam());
                 const max = maxMin(agents);
                 if (!agents.length) { document.getElementById('agentBereich').innerHTML = '<p>Keine Bearbeiter.</p>'; return; }
                 document.getElementById('agentBereich').innerHTML = `
@@ -165,9 +208,10 @@
             }
         }
 
+        // kundenstatistik als tabelle
         async function kundenLaden() {
             try {
-                const kunden = await api('/api/statistics/customers');
+                const kunden = await api('/api/statistics/customers' + tageParam());
                 const max = maxMin(kunden);
                 if (!kunden.length) { document.getElementById('kundeBereich').innerHTML = '<p>Keine Kunden.</p>'; return; }
                 document.getElementById('kundeBereich').innerHTML = `
